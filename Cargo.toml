@@ -15,6 +15,7 @@ rust-version = "1.91"
 # prerelease -- do not pin it.
 soroban-sdk = "27.0.6"
 sororail-common = { path = "contracts/common", version = "0.1.0" }
+proptest = "1.5"
 
 # Lint policy lives here, not in CI flags, so a plain `cargo clippy` locally
 # gives the same verdict as CI. Every member opts in with `[lints] workspace = true`.

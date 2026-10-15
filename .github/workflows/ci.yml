@@ -59,6 +59,7 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets
       - run: cargo nextest run --workspace
+      - run: ./scripts/check_error_docs.sh
 
   doc:
     name: cargo doc
