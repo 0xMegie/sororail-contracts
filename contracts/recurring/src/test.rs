@@ -4,10 +4,10 @@
 
 use soroban_sdk::{
     testutils::{storage::Instance as _, Address as _, Events as _, Ledger as _},
-    token::{StellarAssetClient, TokenClient},
+    token::TokenClient,
     Address, Env, Event,
 };
-use sororail_common::{storage::INSTANCE_BUMP, Error};
+use sororail_common::{storage::INSTANCE_BUMP, testutils::TestEnv, Error};
 
 use crate::{
     contract::{RecurringContract, RecurringContractClient},
@@ -45,16 +45,13 @@ struct Fixture<'a> {
 
 impl Fixture<'_> {
     fn new(max_periods: Option<u32>) -> Self {
-        let env = Env::default();
-        env.mock_all_auths();
-        env.ledger().with_mut(|l| l.timestamp = START);
-
-        let payer = Address::generate(&env);
-        let payee = Address::generate(&env);
-        let outsider = Address::generate(&env);
-        let issuer = Address::generate(&env);
-        let token_address = env.register_stellar_asset_contract_v2(issuer).address();
-        StellarAssetClient::new(&env, &token_address).mint(&payer, &MINT);
+        let te = TestEnv::at(START);
+        let payer = te.make_address();
+        let payee = te.make_address();
+        let outsider = te.make_address();
+        let token_address = te.register_token();
+        te.mint(&token_address, &payer, MINT);
+        let env = te.env().clone();
 
         let client = RecurringContractClient::new(&env, &env.register(RecurringContract, ()));
         client.authorize(

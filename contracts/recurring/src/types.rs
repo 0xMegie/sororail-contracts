@@ -1,4 +1,5 @@
 use soroban_sdk::{contracttype, Address};
+use sororail_common::math;
 
 /// A recurring pull authorization. One per deployed contract instance.
 ///
@@ -50,10 +51,7 @@ pub struct Authorization {
 impl Authorization {
     /// Whether the cap on charges has been reached.
     pub fn is_exhausted(&self) -> bool {
-        match self.max_periods {
-            Some(max) => self.periods_charged >= max,
-            None => false,
-        }
+        self.remaining_periods() == Some(0)
     }
 
     /// Whether a charge may be taken at `at`.
@@ -63,7 +61,45 @@ impl Authorization {
 
     /// Charges still permitted under the cap, if there is one.
     pub fn remaining_periods(&self) -> Option<u32> {
-        self.max_periods
-            .map(|max| max.saturating_sub(self.periods_charged))
+        math::remaining_count(self.max_periods, self.periods_charged)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use soroban_sdk::{testutils::Address as _, Address, Env};
+
+    use super::Authorization;
+
+    #[test]
+    fn cap_checks_match_remaining_period_count() {
+        let env = Env::default();
+        let authorization = |max_periods, periods_charged| Authorization {
+            payer: Address::generate(&env),
+            payee: Address::generate(&env),
+            token: Address::generate(&env),
+            amount_per_period: 1,
+            period_seconds: 1,
+            max_periods,
+            periods_charged,
+            next_chargeable_at: 0,
+            cancelled: false,
+        };
+
+        let below = authorization(Some(3), 2);
+        assert_eq!(below.remaining_periods(), Some(1));
+        assert!(!below.is_exhausted());
+
+        let at_cap = authorization(Some(3), 3);
+        assert_eq!(at_cap.remaining_periods(), Some(0));
+        assert!(at_cap.is_exhausted());
+
+        let above_cap = authorization(Some(3), 4);
+        assert_eq!(above_cap.remaining_periods(), Some(0));
+        assert!(above_cap.is_exhausted());
+
+        let uncapped = authorization(None, u32::MAX);
+        assert_eq!(uncapped.remaining_periods(), None);
+        assert!(!uncapped.is_exhausted());
     }
 }

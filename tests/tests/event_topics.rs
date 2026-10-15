@@ -29,6 +29,7 @@ struct Occurrence {
     file: PathBuf,
     line: usize,
     topics: Vec<String>,
+    event: Option<String>,
 }
 
 fn workspace_root() -> PathBuf {
@@ -119,6 +120,15 @@ fn occurrences(crate_dir: &Path) -> Vec<Occurrence> {
                     file: file.clone(),
                     line: start + 1,
                     topics: parse_topics(&attr).unwrap_or_default(),
+                    event: lines[i + 1..].iter().find_map(|line| {
+                        line.trim_start()
+                            .strip_prefix("pub struct ")
+                            .and_then(|decl| {
+                                decl.split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+                                    .next()
+                            })
+                            .map(str::to_string)
+                    }),
                 });
             }
             i += 1;
@@ -190,6 +200,68 @@ fn every_contract_crate_declares_at_least_one_event() {
     assert!(
         silent.is_empty(),
         "no #[contractevent] found in: {silent:?}"
+    );
+}
+
+#[test]
+fn every_public_event_has_a_pinned_topic_name() {
+    let root = workspace_root();
+    let mut pinned = Vec::new();
+
+    for (name, dir) in contract_crates() {
+        if NON_CONTRACT_CRATES.contains(&name.as_str()) {
+            continue;
+        }
+        for occurrence in occurrences(&dir) {
+            let event = occurrence.event.unwrap_or_else(|| {
+                panic!(
+                    "{}:{} has no adjacent public event struct",
+                    occurrence.file.display(),
+                    occurrence.line
+                )
+            });
+            let topic = occurrence.topics.get(1).unwrap_or_else(|| {
+                panic!(
+                    "{}:{} has no action topic",
+                    occurrence.file.display(),
+                    occurrence.line
+                )
+            });
+            pinned.push((name.clone(), event, topic.clone()));
+        }
+    }
+
+    pinned.sort();
+    let expected = vec![
+        ("batch_payout", "Executed", "executed"),
+        ("escrow", "Cancelled", "cancelled"),
+        ("escrow", "Created", "created"),
+        ("escrow", "Disputed", "disputed"),
+        ("escrow", "Funded", "funded"),
+        ("escrow", "Refunded", "refunded"),
+        ("escrow", "Released", "released"),
+        ("escrow", "Resolved", "resolved"),
+        ("recurring", "Authorized", "authorized"),
+        ("recurring", "Cancelled", "cancelled"),
+        ("recurring", "Charged", "charged"),
+        ("stream", "Cancelled", "cancelled"),
+        ("stream", "Created", "created"),
+        ("stream", "Extended", "extended"),
+        ("stream", "ToppedUp", "topped_up"),
+        ("stream", "Withdrawn", "withdrawn"),
+        ("vesting", "Claimed", "claimed"),
+        ("vesting", "Created", "created"),
+        ("vesting", "Revoked", "revoked"),
+    ]
+    .into_iter()
+    .map(|(contract, event, topic)| (contract.to_string(), event.to_string(), topic.to_string()))
+    .collect::<Vec<_>>();
+
+    assert_eq!(
+        pinned,
+        expected,
+        "public event topic names changed; review indexer compatibility in {}",
+        root.display()
     );
 }
 
