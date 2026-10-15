@@ -137,6 +137,8 @@ pub enum Error {
     VestingCliffAfterEnd = 64,
     /// Nothing vested-but-unclaimed remains to claim.
     VestingNothingToClaim = 65,
+    /// `start + duration` would overflow `u64`.
+    VestingScheduleOverflow = 66,
 
     // ----- recurring: 80–99 -----
     /// Reserved for the future id-keyed recurring design.

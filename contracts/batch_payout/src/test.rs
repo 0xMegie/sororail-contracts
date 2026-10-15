@@ -5,7 +5,7 @@
 use soroban_sdk::{
     testutils::{Address as _, Events as _},
     token::{StellarAssetClient, TokenClient},
-    vec, Address, Env, Vec,
+    vec, Address, Env, Event, Vec,
 };
 use sororail_common::Error;
 
@@ -102,17 +102,18 @@ fn execute_pays_each_recipient_their_own_amount() {
     // The contract is a conduit; it holds nothing.
     assert_eq!(f.token.balance(&f.client.address), 0);
 
-    let events = f.env.events().all();
-    assert_eq!(events.len(), 1);
-
-    let executed_event = &events[0];
+    // `execute` emits one token transfer per recipient before its own
+    // `Executed`, so take the last event rather than assuming an index.
+    let all = f.env.events().all();
+    let events = all.events();
+    let executed_event = events.last().expect("no events emitted");
     let expected = Executed {
         funder: f.funder.clone(),
         token: f.token.address.clone(),
         count: 3,
         total: 357,
     };
-    assert_eq!(executed_event, &expected);
+    assert_eq!(executed_event, &expected.to_xdr(&f.env, &f.client.address));
 }
 
 #[test]

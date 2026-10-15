@@ -70,14 +70,16 @@ impl Grant {
     /// # Overflow ceiling
     ///
     /// This function computes `total * elapsed / duration` using [`math::mul_div`],
-    /// which errors on overflow rather than wrapping. For a given duration, the
-    /// maximum safe `total` is approximately `i128::MAX / duration_in_seconds`.
+    /// which errors on overflow rather than wrapping. The overflow risk is on
+    /// the intermediate product `total * elapsed`, not on `total` alone: at
+    /// the midpoint of the schedule, `elapsed` is about half the duration, so
+    /// the maximum safe `total` is approximately `i128::MAX / (duration / 2)`.
     ///
-    /// For example, with a 10-year vesting duration (~315,576,000 seconds), the
-    /// maximum total before `Overflow` is roughly 29 million tokens. Integrators
-    /// should size their token's decimals and supply to stay within this limit:
-    /// a token with 18 decimal places has a per-vesting-grant ceiling of about
-    /// 29 femto-tokens per second of duration, or ~1 million base units for 10 years.
+    /// For example, with a 10-year vesting duration (~315,576,000 seconds),
+    /// `elapsed` reaches ~157,788,000 at the midpoint, so `total` can be as
+    /// large as roughly `i128::MAX / 157,788,000` (~1.08e30) before
+    /// `Overflow` -- many orders of magnitude above any realistic token
+    /// supply, even at 18 decimal places.
     pub fn vested_amount(&self, at: u64) -> Result<i128, Error> {
         let effective = match self.revoked_at {
             Some(revoked) => at.min(revoked),
@@ -110,6 +112,15 @@ impl Grant {
             self.duration > 0,
             "linear vesting branch requires non-zero duration"
         );
+        // `at - self.start` cannot underflow: `at >= cliff_at >= start`
+        // always holds (the branches above return before this point
+        // whenever `at < cliff_at`), so `math::sub` here is defense-in-depth
+        // rather than a path that can actually return `Underflow`. The
+        // `saturating_add` calls above are what make `cliff_at`/`end`
+        // well-defined rather than panicking on an unvalidated `Grant`, but
+        // `VestingContract::create` additionally rejects any `start +
+        // duration` that would need that saturation, so for a grant created
+        // through the contract, `end` is always the true, non-saturated sum.
         let elapsed = math::sub(i128::from(at), i128::from(self.start))?;
         math::mul_div(self.total, elapsed, i128::from(self.duration))
     }
