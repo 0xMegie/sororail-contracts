@@ -79,6 +79,14 @@ impl EscrowContract {
     }
 
     /// Pulls the agreed amount from the depositor into the contract.
+    ///
+    /// Rejected once `deadline` has passed (inclusive, matching the boundary
+    /// at which the depositor's unilateral refund right begins): funding an
+    /// agreement that has already lapsed would only let the depositor pull
+    /// their own funds right back out via `refund`, so it is refused up
+    /// front with [`Error::DeadlinePassed`] rather than the generic
+    /// [`Error::EscrowClosed`], which describes a *terminal* state and would
+    /// be misleading here -- a never-funded, lapsed escrow is still `Created`.
     pub fn fund(env: Env) -> Result<(), Error> {
         let mut escrow = storage::load(&env)?;
         if escrow.state.is_terminal() {

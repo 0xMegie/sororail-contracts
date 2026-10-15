@@ -5,8 +5,8 @@
 use soroban_sdk::{
     map,
     testutils::{storage::Instance as _, Address as _, Events as _, Ledger as _},
-    token::TokenClient,
-    vec, Address, Env, IntoVal, Symbol, Val,
+    token::{StellarAssetClient, TokenClient},
+    vec, Address, Env, Event, IntoVal, Symbol, Val,
 };
 use sororail_common::{storage::INSTANCE_BUMP, testutils::TestEnv, Error};
 
@@ -18,13 +18,17 @@ use crate::{
 
 #[test]
 fn bump_restores_the_instance_ttl_after_ledger_advance() {
-    let f = Fixture::new();
+    let f = Fixture::new(true);
     f.env
         .ledger()
         .set_sequence_number(f.env.ledger().sequence() + INSTANCE_BUMP - 1);
-    assert!(f.env.storage().instance().get_ttl() < INSTANCE_BUMP);
+    f.env.as_contract(&f.client.address, || {
+        assert!(f.env.storage().instance().get_ttl() < INSTANCE_BUMP);
+    });
     f.client.bump();
-    assert_eq!(f.env.storage().instance().get_ttl(), INSTANCE_BUMP);
+    f.env.as_contract(&f.client.address, || {
+        assert_eq!(f.env.storage().instance().get_ttl(), INSTANCE_BUMP);
+    });
 }
 
 const RATE: i128 = 100;
@@ -174,6 +178,25 @@ fn accrual_reports_overflow_rather_than_wrapping() {
     assert_eq!(s.accrued_at(START + 2), Err(Error::Overflow));
 }
 
+#[test]
+fn accrual_is_exact_at_a_rate_and_elapsed_that_divide_badly() {
+    // Unlike vesting's `total * elapsed / duration`, accrual never divides,
+    // so there is no rounding direction to get wrong: it is always exactly
+    // `rate * elapsed`, even for a rate/elapsed pair that would leave a
+    // remainder under any proportional (divide-then-multiply) formulation.
+    let env = Env::default();
+    let mut s = bare(&env);
+    s.rate_per_second = 7; // prime; divides unevenly into most spans
+    s.stop = START + 3; // an odd, non-multiple-of-7 span
+    s.deposited = 7 * 3;
+
+    assert_eq!(s.accrued_at(START + 1), Ok(7));
+    assert_eq!(s.accrued_at(START + 2), Ok(14));
+    assert_eq!(s.accrued_at(START + 3), Ok(21));
+    // Capped at `stop`, not truncated to some lower rounded figure.
+    assert_eq!(s.accrued_at(START + 3), Ok(s.deposited));
+}
+
 /// Documents that `available_at` degrades to `Err(Underflow)` if `withdrawn`
 /// ever exceeds accrued (e.g. a future code path bug). Today's `withdraw`
 /// rejects `requested > available`, so this state is unreachable through the
@@ -214,8 +237,11 @@ fn create_funds_the_whole_span_up_front() {
 #[test]
 fn create_emits_the_created_event() {
     let f = Fixture::new(true);
-    let events = f.env.events().all();
-    assert_eq!(events.len(), 1);
+    // `create` emits the token's own transfer event before its own
+    // `Created`, so take the last event rather than assuming an index.
+    let all = f.env.events().all();
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
     let expected = Created {
         sender: f.sender.clone(),
         recipient: f.recipient.clone(),
@@ -226,7 +252,7 @@ fn create_emits_the_created_event() {
         cancellable: true,
         deposited: DEPOSITED,
     };
-    assert_eq!(&events[0], &expected);
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
 }
 
 #[test]
@@ -297,7 +323,11 @@ fn create_allows_the_exact_max_funding_boundary() {
     let (token_client, sender) = te.make_token(i128::MAX);
     let token = token_client.address.clone();
     let recipient = te.make_address();
+ test/consolidate-contract-helpers-and-stable-ids
     let env = te.env().clone();
+
+    let env = te.env.clone();
+ main
     let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
 
     c.create(
@@ -385,7 +415,11 @@ fn create_reverts_cleanly_when_sender_cannot_fund() {
     let (token_client, sender) = te.make_token(RATE);
     let token = token_client.address.clone();
     let recipient = te.make_address();
+ test/consolidate-contract-helpers-and-stable-ids
     let env = te.env().clone();
+
+    let env = te.env.clone();
+ main
     let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
 
     assert!(c
@@ -499,15 +533,17 @@ fn withdraw_emits_the_withdrawn_event() {
     f.at(START + 300);
     f.client.withdraw(&None);
 
-    let events = f.env.events().all();
-    // Created + Withdrawn
-    assert_eq!(events.len(), 2);
+    // `withdraw` emits the token's own transfer event before its own
+    // `Withdrawn`, so take the last event rather than assuming an index.
+    let all = f.env.events().all();
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
     let expected = Withdrawn {
         recipient: f.recipient.clone(),
         amount: RATE * 300,
         total_withdrawn: RATE * 300,
     };
-    assert_eq!(&events[1], &expected);
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
 }
 
 #[test]
@@ -621,16 +657,18 @@ fn cancel_emits_the_cancelled_event() {
     f.at(START + 400);
     f.client.cancel();
 
-    let events = f.env.events().all();
-    // Created + Cancelled
-    assert_eq!(events.len(), 2);
+    // `cancel` pays out up to two token transfers before its own
+    // `Cancelled`, so take the last event rather than assuming an index.
+    let all = f.env.events().all();
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
     let expected = Cancelled {
         sender: f.sender.clone(),
         settled_to_recipient: RATE * 400,
         refunded_to_sender: DEPOSITED - RATE * 400,
         cancelled_at: START + 400,
     };
-    assert_eq!(&events[1], &expected);
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
 }
 
 #[test]
@@ -773,7 +811,11 @@ fn top_up_rejects_a_span_that_overflows_the_stop_timestamp() {
     let (token_client, sender) = te.make_token(i128::MAX);
     let token = token_client.address.clone();
     let recipient = te.make_address();
+ test/consolidate-contract-helpers-and-stable-ids
     let env = te.env().clone();
+
+    let env = te.env.clone();
+ main
     let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
     c.create(&sender, &recipient, &token, &1, &START, &(START + 1), &true);
 

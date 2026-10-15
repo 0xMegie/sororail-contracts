@@ -3,9 +3,10 @@
 #![allow(clippy::arithmetic_side_effects)]
 
 use soroban_sdk::{
+    map,
     testutils::{storage::Instance as _, Address as _, Events as _, Ledger as _},
     token::TokenClient,
-    Address, Env,
+    vec, Address, Env, Event, IntoVal, Symbol, Val,
 };
 use sororail_common::{storage::INSTANCE_BUMP, testutils::TestEnv, Error};
 
@@ -17,13 +18,17 @@ use crate::{
 
 #[test]
 fn bump_restores_the_instance_ttl_after_ledger_advance() {
-    let f = Fixture::new();
+    let f = Fixture::new(true);
     f.env
         .ledger()
         .set_sequence_number(f.env.ledger().sequence() + INSTANCE_BUMP - 1);
-    assert!(f.env.storage().instance().get_ttl() < INSTANCE_BUMP);
+    f.env.as_contract(&f.client.address, || {
+        assert!(f.env.storage().instance().get_ttl() < INSTANCE_BUMP);
+    });
     f.client.bump();
-    assert_eq!(f.env.storage().instance().get_ttl(), INSTANCE_BUMP);
+    f.env.as_contract(&f.client.address, || {
+        assert_eq!(f.env.storage().instance().get_ttl(), INSTANCE_BUMP);
+    });
 }
 
 const TOTAL: i128 = 1_000_000;
@@ -46,7 +51,11 @@ impl Fixture<'_> {
     }
 
     fn with_schedule(revocable: bool, cliff: u64, duration: u64) -> Self {
-        let te = TestEnv::at(START);
+        Fixture::with_schedule_at(START, cliff, duration, revocable)
+    }
+
+    fn with_schedule_at(start: u64, cliff: u64, duration: u64, revocable: bool) -> Self {
+        let te = TestEnv::at(start);
         let (token, grantor) = te.make_token(MINT);
         let token_address = token.address.clone();
         let beneficiary = te.make_address();
@@ -58,7 +67,7 @@ impl Fixture<'_> {
             &beneficiary,
             &token_address,
             &TOTAL,
-            &START,
+            &start,
             &cliff,
             &duration,
             &revocable,
@@ -191,6 +200,33 @@ fn vesting_reports_overflow_rather_than_wrapping() {
     let mut g = bare(&env, 0, DURATION);
     g.total = i128::MAX;
     assert_eq!(g.vested_amount(START + 500), Err(Error::Overflow));
+}
+
+#[test]
+fn vested_amount_never_underflows_with_a_start_near_u64_max() {
+    // `elapsed = effective - self.start` is a u64 subtraction before the
+    // cast to i128; if `effective` could ever fall below `start`, this
+    // would panic in debug builds (or wrap in release) rather than return
+    // an `Error`. `VestingContract::create` rejects any schedule whose
+    // `start + duration` would overflow, which is what keeps `end` (and so
+    // `effective`, which is always clamped below it) from ever landing
+    // below `start` here.
+    let env = Env::default();
+    let g = Grant {
+        grantor: Address::generate(&env),
+        beneficiary: Address::generate(&env),
+        token: Address::generate(&env),
+        total: TOTAL,
+        start: u64::MAX - 1,
+        cliff: 0,
+        duration: 1,
+        revocable: true,
+        claimed: 0,
+        returned: 0,
+        revoked_at: None,
+    };
+    assert_eq!(g.vested_amount(u64::MAX - 1), Ok(0));
+    assert_eq!(g.vested_amount(u64::MAX), Ok(TOTAL));
 }
 
 /// Guards the division by `duration` in the linear branch of
@@ -424,6 +460,31 @@ fn create_reports_the_first_validation_error_when_several_apply() {
 }
 
 #[test]
+fn create_rejects_a_schedule_whose_end_would_overflow_u64() {
+    // `start + duration` must be representable, or `end_at`'s
+    // `saturating_add` would silently cap it and `vested_amount` would be
+    // evaluated against a shortened schedule instead of erroring up front.
+    let env = Env::default();
+    env.mock_all_auths();
+    let c = VestingContractClient::new(&env, &env.register(VestingContract, ()));
+    let (a, b, t) = (
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+    );
+    assert_eq!(
+        c.try_create(&a, &b, &t, &TOTAL, &u64::MAX, &0, &1, &true),
+        Err(Ok(Error::VestingScheduleOverflow))
+    );
+}
+
+#[test]
+fn create_accepts_a_schedule_whose_end_is_exactly_u64_max() {
+    let f = Fixture::with_schedule_at(u64::MAX - 1, 0, 1, true);
+    assert_eq!(f.client.get().duration, 1);
+}
+
+#[test]
 fn create_rejects_a_second_call() {
     let f = Fixture::new(true);
     assert_eq!(
@@ -583,7 +644,11 @@ fn create_reverts_cleanly_when_grantor_cannot_fund() {
     let (token_client, grantor) = te.make_token(1);
     let token = token_client.address.clone();
     let beneficiary = te.make_address();
+ test/consolidate-contract-helpers-and-stable-ids
     let env = te.env().clone();
+
+    let env = te.env.clone();
+ main
     let c = VestingContractClient::new(&env, &env.register(VestingContract, ()));
 
     assert!(c
@@ -612,7 +677,11 @@ fn create_emits_the_created_event() {
     let (token_client, grantor) = te.make_token(MINT);
     let token_address = token_client.address.clone();
     let beneficiary = te.make_address();
+ test/consolidate-contract-helpers-and-stable-ids
     let env = te.env().clone();
+
+    let env = te.env.clone();
+ main
 
     let client = VestingContractClient::new(&env, &env.register(VestingContract, ()));
     client.create(
@@ -633,7 +702,7 @@ fn create_emits_the_created_event() {
     let revocable: Val = true.into_val(&env);
     // Map data: keys are the field names, serialized in sorted order.
     let data: Val = map![
-        env,
+        &env,
         (Symbol::new(&env, "beneficiary"), beneficiary.into_val(&env)),
         (Symbol::new(&env, "cliff"), cliff),
         (Symbol::new(&env, "duration"), duration),
@@ -646,11 +715,11 @@ fn create_emits_the_created_event() {
     assert_eq!(
         env.events().all().filter_by_contract(&client.address),
         vec![
-            env,
+            &env,
             (
                 client.address.clone(),
                 vec![
-                    env,
+                    &env,
                     Symbol::new(&env, "vesting").into_val(&env),
                     Symbol::new(&env, "created").into_val(&env),
                     grantor.into_val(&env),
@@ -968,19 +1037,19 @@ fn a_schedule_that_divides_badly_still_conserves() {
 
 #[test]
 fn vesting_with_long_duration_and_large_total_probes_overflow_boundary() {
-    // A 10-year vesting duration in seconds: 10 * 365.25 * 24 * 3600 ≈ 315,576,000.
-    // For mul_div to avoid overflow with such a duration, the maximum practical
-    // total is roughly i128::MAX / 315_576_000 ≈ 29,225,000.
-    // This test uses a duration scaled to fit in a fixture, but validates the
-    // overflow ceiling documented in vested_amount.
+    // `mul_div` computes `total * elapsed` before dividing by `duration`, so
+    // the overflow ceiling is on that product, not on `total` alone: at the
+    // midpoint of a 10-year (≈315,576,000s) schedule, `elapsed` is
+    // ≈157,788,000, and overflow needs `total > i128::MAX / elapsed`
+    // (≈1.08e30) -- many orders of magnitude above a realistic token supply.
     const TEN_YEARS_SECONDS: u64 = 315_576_000;
     const SAFE_TOTAL: i128 = 29_000_000;
-    const OVERFLOW_TOTAL: i128 = 30_000_000;
+    const OVERFLOW_TOTAL: i128 = i128::MAX / 2;
 
     let env = Env::default();
 
     // Test that a safe total with long duration vests successfully.
-    let mut g_safe = Grant {
+    let g_safe = Grant {
         grantor: Address::generate(&env),
         beneficiary: Address::generate(&env),
         token: Address::generate(&env),
@@ -1007,7 +1076,7 @@ fn vesting_with_long_duration_and_large_total_probes_overflow_boundary() {
     );
 
     // Test that an unsafe total with long duration overflows.
-    let mut g_unsafe = Grant {
+    let g_unsafe = Grant {
         grantor: Address::generate(&env),
         beneficiary: Address::generate(&env),
         token: Address::generate(&env),

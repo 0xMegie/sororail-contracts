@@ -144,6 +144,8 @@ Funds held by the contract, released on a condition.
 - `release(caller)` — beneficiary receives; callable by depositor or arbiter
 - `refund(caller)` — callable by depositor after deadline, or by arbiter at any time. If in `Disputed` state, callable by anyone after 7 days past the original deadline to recover from an unresponsive arbiter.
 - `dispute(caller)` / `resolve(split_bps)` — arbiter splits between parties; `split_bps` is the beneficiary's share
+- `dispute` requires a configured arbiter and errors otherwise, so `Disputed` is never reachable without one; `resolve` re-checks independently as defense-in-depth.
+- `fund` requires `deadline` not to have passed (inclusive); past it, it errors with a dedicated `DeadlinePassed` rather than the generic `EscrowClosed`, since the escrow is still `Created`, not terminal.
 - States: `Created → Funded → (Released | Refunded | Disputed → Resolved)`. Illegal transitions must error, not panic.
 - **Dispute timeout:** Once the deadline passes, an unresolved dispute has a 7-day grace period. After this period, either party (or anyone) may refund to recover funds from an unresponsive arbiter. This is a safety mechanism, not a normal flow.
 
@@ -159,6 +161,7 @@ Continuous per-second transfer from sender to recipient.
 - Accrual is computed from ledger timestamp at read time. Never write per-second state.
 - The critical correctness property: withdrawn + refunded + remaining always equals deposited, exactly, with no rounding leakage. Test this as an invariant.
 - The stream is fully funded for its whole declared span, so `deposited == rate * (stop - start)` always holds. `top_up` therefore rejects an amount that is not a whole number of seconds rather than stranding the remainder.
+- Unlike `vesting`'s proportional math, this contract's math never divides at all — accrual is pure multiplication (`rate * elapsed`) — so "no rounding leakage" holds by construction, not by a rounding-direction rule. There is no rounding direction to pick here.
 
 #### `vesting`
 

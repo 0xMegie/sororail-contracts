@@ -16,13 +16,17 @@ use crate::{
 
 #[test]
 fn bump_restores_the_instance_ttl_after_ledger_advance() {
-    let f = Fixture::new();
+    let f = Fixture::new(None);
     f.env
         .ledger()
         .set_sequence_number(f.env.ledger().sequence() + INSTANCE_BUMP - 1);
-    assert!(f.env.storage().instance().get_ttl() < INSTANCE_BUMP);
+    f.env.as_contract(&f.client.address, || {
+        assert!(f.env.storage().instance().get_ttl() < INSTANCE_BUMP);
+    });
     f.client.bump();
-    assert_eq!(f.env.storage().instance().get_ttl(), INSTANCE_BUMP);
+    f.env.as_contract(&f.client.address, || {
+        assert_eq!(f.env.storage().instance().get_ttl(), INSTANCE_BUMP);
+    });
 }
 
 const AMOUNT: i128 = 10_000;

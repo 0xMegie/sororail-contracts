@@ -18,6 +18,14 @@ impl VestingContract {
     /// `cliff == 0` is linear vesting with no cliff. A cliff after the end
     /// would make the schedule unreachable, so it is rejected.
     ///
+    /// `start + duration` is rejected if it would overflow `u64`, rather than
+    /// letting [`Grant::end_at`](crate::types::Grant::end_at)'s
+    /// `saturating_add` silently cap it. This is what [`Grant::vested_amount`]
+    /// depends on to compute `effective - start` without underflowing: once
+    /// `create` has validated that the schedule's end is representable,
+    /// `effective` (which is always clamped into `[cliff_at, end]`) can never
+    /// fall below `start`.
+    ///
     /// The full total is pulled from the grantor immediately -- a grant is
     /// never partially funded.
     ///
@@ -56,6 +64,9 @@ impl VestingContract {
         }
         if cliff > duration {
             return Err(Error::VestingCliffAfterEnd);
+        }
+        if start.checked_add(duration).is_none() {
+            return Err(Error::VestingScheduleOverflow);
         }
 
         grantor.require_auth();
