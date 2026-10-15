@@ -1,9 +1,9 @@
 use soroban_sdk::{
     testutils::{storage::Instance as _, Address as _, Events as _, Ledger as _},
-    token::{StellarAssetClient, TokenClient},
+    token::TokenClient,
     Address, Env,
 };
-use sororail_common::{storage::INSTANCE_BUMP, Error};
+use sororail_common::{storage::INSTANCE_BUMP, testutils::TestEnv, Error};
 
 use crate::{
     contract::{EscrowContract, EscrowContractClient},
@@ -40,19 +40,13 @@ impl Fixture<'_> {
     /// Builds an initialized escrow. `with_arbiter` controls whether the
     /// dispute path is available.
     fn new(with_arbiter: bool) -> Self {
-        let env = Env::default();
-        env.mock_all_auths();
-        env.ledger().with_mut(|l| l.timestamp = START_TS);
-
-        let depositor = Address::generate(&env);
-        let beneficiary = Address::generate(&env);
-        let arbiter = Address::generate(&env);
-        let outsider = Address::generate(&env);
-
-        let issuer = Address::generate(&env);
-        let sac = env.register_stellar_asset_contract_v2(issuer);
-        let token_address = sac.address();
-        StellarAssetClient::new(&env, &token_address).mint(&depositor, &(AMOUNT * 10));
+        let te = TestEnv::at(START_TS);
+        let (token, depositor) = te.make_token(AMOUNT * 10);
+        let token_address = token.address.clone();
+        let beneficiary = te.make_address();
+        let arbiter = te.make_address();
+        let outsider = te.make_address();
+        let env = te.env().clone();
 
         let contract_id = env.register(EscrowContract, ());
         let client = EscrowContractClient::new(&env, &contract_id);
@@ -128,7 +122,7 @@ fn init_rejects_a_second_call() {
 
 #[test]
 fn init_rejects_non_positive_amounts() {
-    let env = Env::default();
+    let env = TestEnv::at(START_TS).env;
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
     let client = EscrowContractClient::new(&env, &env.register(EscrowContract, ()));
@@ -148,7 +142,7 @@ fn init_rejects_non_positive_amounts() {
 
 #[test]
 fn init_rejects_a_deadline_that_is_not_in_the_future() {
-    let env = Env::default();
+    let env = TestEnv::at(START_TS).env;
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
     let client = EscrowContractClient::new(&env, &env.register(EscrowContract, ()));
@@ -169,7 +163,7 @@ fn init_rejects_a_deadline_that_is_not_in_the_future() {
 
 #[test]
 fn entry_points_error_before_init() {
-    let env = Env::default();
+    let env = TestEnv::new().env;
     env.mock_all_auths();
     let client = EscrowContractClient::new(&env, &env.register(EscrowContract, ()));
     let who = Address::generate(&env);
