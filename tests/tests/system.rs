@@ -219,6 +219,123 @@ fn an_operations_month_conserves_every_token() {
     s.assert_nothing_lost(&parties);
 }
 
+/// Right after `create`, the stream contract holds exactly what was
+/// deposited for it -- no more (over-funded from elsewhere) and no less
+/// (a partial transfer that still reported success).
+#[test]
+fn stream_holds_exactly_the_deposit_after_create() {
+    let s = System::new();
+    let dave = Address::generate(&s.env);
+
+    let rate = 2;
+    let start = START;
+    let stop = START + YEAR;
+    s.stream
+        .create(&s.employer, &dave, &s.token.address, &rate, &start, &stop, &true);
+
+    let deposit = rate * (stop - start) as i128;
+    assert_eq!(s.stream.get().deposited, deposit);
+    assert_eq!(s.balance(&s.stream.address), deposit);
+}
+
+/// Right after `create`, the vesting contract holds exactly the granted
+/// total -- the balance the beneficiary's whole schedule is a claim
+/// against.
+#[test]
+fn vesting_holds_exactly_the_granted_total_after_create() {
+    let s = System::new();
+    let carol = Address::generate(&s.env);
+
+    let total = 12_000_000;
+    s.vesting.create(
+        &s.employer,
+        &carol,
+        &s.token.address,
+        &total,
+        &START,
+        &YEAR,
+        &(YEAR * 4),
+        &true,
+    );
+
+    assert_eq!(s.vesting.get().total, total);
+    assert_eq!(s.balance(&s.vesting.address), total);
+}
+
+/// Every stateful contract's instance (its config: sender/recipient,
+/// token, schedule) must keep responding after a ledger-sequence jump far
+/// past the 30-day TTL bump every entry point extends it to
+/// (`sororail_common::storage::INSTANCE_BUMP`). `soroban-sdk`'s test
+/// harness emulates the network's automatic restoration of an archived
+/// entry, so this mainly guards against a regression that bypasses
+/// `extend_instance` entirely (e.g. a new entry point, or a storage key
+/// change) and would otherwise go unnoticed until a real contract on
+/// mainnet is archived and un-restorable without an explicit restore
+/// transaction.
+#[test]
+fn each_contracts_instance_ttl_survives_a_long_ledger_advance() {
+    let s = System::new();
+
+    let carol = Address::generate(&s.env);
+    let dave = Address::generate(&s.env);
+    let supplier = Address::generate(&s.env);
+    let vendor = Address::generate(&s.env);
+
+    s.vesting.create(
+        &s.employer,
+        &carol,
+        &s.token.address,
+        &12_000_000,
+        &START,
+        &YEAR,
+        &(YEAR * 4),
+        &true,
+    );
+    s.stream.create(
+        &s.employer,
+        &dave,
+        &s.token.address,
+        &1,
+        &START,
+        &(START + YEAR),
+        &true,
+    );
+    s.escrow.init(
+        &s.employer,
+        &supplier,
+        &None,
+        &s.token.address,
+        &2_000_000,
+        &(START + MONTH * 2),
+    );
+    s.escrow.fund();
+    s.recurring.authorize(
+        &s.employer,
+        &vendor,
+        &s.token.address,
+        &99_000,
+        &MONTH,
+        &Some(12),
+    );
+
+    // Instance entries are bumped to 30 days (INSTANCE_BUMP) of TTL by
+    // every entry point above. Jump ten times that far in one leap, with
+    // no intervening call to re-extend it.
+    let instance_bump_ledgers = 30 * 17_280;
+    let current = s.env.ledger().sequence();
+    s.env
+        .ledger()
+        .set_sequence_number(current + 10 * instance_bump_ledgers);
+
+    assert!(s.vesting.try_get().is_ok(), "vesting instance unreachable after TTL advance");
+    assert!(s.stream.try_get().is_ok(), "stream instance unreachable after TTL advance");
+    assert!(s.escrow.try_get().is_ok(), "escrow instance unreachable after TTL advance");
+    assert!(
+        s.recurring.try_get().is_ok(),
+        "recurring instance unreachable after TTL advance"
+    );
+}
+
 /// Two contracts holding the same token must not see each other's funds.
 #[test]
 fn contracts_sharing_a_token_stay_isolated() {

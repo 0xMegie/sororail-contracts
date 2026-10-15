@@ -167,3 +167,64 @@ mod remaining_count_tests {
         assert_eq!(remaining_count(None, u32::MAX), None);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A small xorshift PRNG. `rand`/`proptest` aren't workspace dependencies
+    /// (see `CONTRIBUTING.md`'s supply-chain policy), and this is plenty for
+    /// a deterministic, seeded sweep over `split_bps`'s input space.
+    struct Xorshift(u64);
+
+    impl Xorshift {
+        fn next_u64(&mut self) -> u64 {
+            let mut x = self.0;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            self.0 = x;
+            x
+        }
+
+        /// Uniform in `[lo, hi]`.
+        fn next_i128_in(&mut self, lo: i128, hi: i128) -> i128 {
+            let span = (hi - lo + 1) as u128;
+            lo + (self.next_u64() as u128 % span) as i128
+        }
+
+        fn next_bps(&mut self) -> u32 {
+            (self.next_u64() % (MAX_BPS as u64 + 1)) as u32
+        }
+    }
+
+    /// `split_bps`'s whole contract is that the two shares it returns always
+    /// sum back to exactly the input, with no rounding leakage -- escrow
+    /// dispute resolution depends on this holding for every valid `amount`
+    /// and `bps`, not just the hand-picked doctest example.
+    #[test]
+    fn split_bps_sums_to_input_across_random_inputs() {
+        let mut rng = Xorshift(0x5eed_u64.wrapping_add(1));
+
+        for _ in 0..10_000 {
+            let amount = rng.next_i128_in(0, 1_000_000_000_000);
+            let bps = rng.next_bps();
+
+            let (first, second) = split_bps(amount, bps)
+                .unwrap_or_else(|err| panic!("split_bps({amount}, {bps}) failed: {err:?}"));
+
+            assert_eq!(
+                first + second,
+                amount,
+                "split_bps({amount}, {bps}) = ({first}, {second}), which does not sum to {amount}"
+            );
+            assert!(first >= 0, "first share went negative: {first}");
+            assert!(second >= 0, "second share went negative: {second}");
+        }
+    }
+
+    #[test]
+    fn split_bps_rejects_bps_over_max() {
+        assert_eq!(split_bps(100, MAX_BPS + 1), Err(Error::InvalidBasisPoints));
+    }
+}
