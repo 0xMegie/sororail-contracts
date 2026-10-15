@@ -31,6 +31,17 @@ use crate::Error;
 /// Denominator for basis-point math. 10000 bps == 100%.
 pub const BPS_DENOMINATOR: i128 = 10_000;
 
+/// Returns the uses left under an optional cap, saturating at zero.
+///
+/// `None` represents an unbounded count. Shared by types that expose remaining
+/// uses so capped behavior stays consistent across contracts.
+pub const fn remaining_count(cap: Option<u32>, used: u32) -> Option<u32> {
+    match cap {
+        Some(cap) => Some(cap.saturating_sub(used)),
+        None => None,
+    }
+}
+
 /// Maximum valid basis points.
 pub const MAX_BPS: u32 = 10_000;
 
@@ -141,5 +152,18 @@ pub fn min(a: i128, b: i128) -> i128 {
         a
     } else {
         b
+    }
+}
+
+#[cfg(test)]
+mod remaining_count_tests {
+    use super::remaining_count;
+
+    #[test]
+    fn cap_remaining_count_saturates_and_supports_no_cap() {
+        assert_eq!(remaining_count(Some(3), 1), Some(2));
+        assert_eq!(remaining_count(Some(3), 3), Some(0));
+        assert_eq!(remaining_count(Some(3), 4), Some(0));
+        assert_eq!(remaining_count(None, u32::MAX), None);
     }
 }
