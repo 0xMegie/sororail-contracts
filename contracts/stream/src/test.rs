@@ -50,7 +50,7 @@ impl Fixture<'_> {
         let token_address = token.address.clone();
         let recipient = te.make_address();
         let outsider = te.make_address();
-        let env = te.env;
+        let env = te.env().clone();
 
         let client = StreamContractClient::new(&env, &env.register(StreamContract, ()));
         client.create(
@@ -297,7 +297,7 @@ fn create_allows_the_exact_max_funding_boundary() {
     let (token_client, sender) = te.make_token(i128::MAX);
     let token = token_client.address.clone();
     let recipient = te.make_address();
-    let env = te.env;
+    let env = te.env().clone();
     let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
 
     c.create(
@@ -356,10 +356,18 @@ fn create_rejects_identical_sender_and_recipient() {
 fn self_stream_is_refused_without_moving_funds() {
     let te = TestEnv::at(START);
     let (token, sender) = te.make_token(MINT);
-    let env = te.env;
+    let env = te.env().clone();
     let client = StreamContractClient::new(&env, &env.register(StreamContract, ()));
     assert_eq!(
-        client.try_create(&sender, &sender, &token.address, &RATE, &START, &STOP, &true),
+        client.try_create(
+            &sender,
+            &sender,
+            &token.address,
+            &RATE,
+            &START,
+            &STOP,
+            &true
+        ),
         Err(Ok(Error::IdenticalParties))
     );
     assert_eq!(token.balance(&sender), MINT);
@@ -377,7 +385,7 @@ fn create_reverts_cleanly_when_sender_cannot_fund() {
     let (token_client, sender) = te.make_token(RATE);
     let token = token_client.address.clone();
     let recipient = te.make_address();
-    let env = te.env;
+    let env = te.env().clone();
     let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
 
     assert!(c
@@ -578,7 +586,7 @@ fn withdraw_requires_the_recipients_authorization() {
     let (token_client, sender) = te.make_token(MINT);
     let token = token_client.address.clone();
     let recipient = te.make_address();
-    let env = te.env;
+    let env = te.env().clone();
     let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
     c.create(&sender, &recipient, &token, &RATE, &START, &STOP, &true);
 
@@ -765,7 +773,7 @@ fn top_up_rejects_a_span_that_overflows_the_stop_timestamp() {
     let (token_client, sender) = te.make_token(i128::MAX);
     let token = token_client.address.clone();
     let recipient = te.make_address();
-    let env = te.env;
+    let env = te.env().clone();
     let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
     c.create(&sender, &recipient, &token, &1, &START, &(START + 1), &true);
 
@@ -827,7 +835,7 @@ fn extend_rejects_funding_that_overflows() {
     let (token_client, sender) = te.make_token(i128::MAX);
     let token = token_client.address.clone();
     let recipient = te.make_address();
-    let c = StreamContractClient::new(&te.env, &te.env.register(StreamContract, ()));
+    let c = StreamContractClient::new(te.env(), &te.env().register(StreamContract, ()));
     c.create(
         &sender,
         &recipient,
