@@ -200,6 +200,58 @@ fn error_discriminants_match_the_published_abi_table() {
     }
 }
 
+/// Catches collisions between otherwise-correct ABI assignments.
+#[test]
+fn error_discriminants_are_unique() {
+    let mut discriminants = [
+        Error::AlreadyInitialized as u32,
+        Error::NotInitialized as u32,
+        Error::Unauthorized as u32,
+        Error::InvalidAmount as u32,
+        Error::InvalidTimeRange as u32,
+        Error::Overflow as u32,
+        Error::Underflow as u32,
+        Error::DivisionByZero as u32,
+        Error::InvalidBasisPoints as u32,
+        Error::InvalidState as u32,
+        Error::DeadlineNotReached as u32,
+        Error::DeadlinePassed as u32,
+        Error::InsufficientBalance as u32,
+        Error::InvalidDuration as u32,
+        Error::IdenticalParties as u32,
+        Error::EscrowNotFundable as u32,
+        Error::EscrowNotFunded as u32,
+        Error::EscrowClosed as u32,
+        Error::EscrowNoArbiter as u32,
+        Error::EscrowNotDisputed as u32,
+        Error::EscrowAlreadyDisputed as u32,
+        Error::EscrowNotCancellable as u32,
+        Error::StreamNotFound as u32,
+        Error::StreamCancelled as u32,
+        Error::StreamNotCancellable as u32,
+        Error::StreamInsufficientAccrued as u32,
+        Error::StreamNotExtendable as u32,
+        Error::VestingNotFound as u32,
+        Error::VestingCliffNotReached as u32,
+        Error::VestingNotRevocable as u32,
+        Error::VestingRevoked as u32,
+        Error::VestingCliffAfterEnd as u32,
+        Error::VestingNothingToClaim as u32,
+        Error::RecurringNotFound as u32,
+        Error::RecurringCancelled as u32,
+        Error::RecurringPeriodNotElapsed as u32,
+        Error::RecurringExhausted as u32,
+        Error::BatchEmpty as u32,
+        Error::BatchTooLarge as u32,
+    ];
+    discriminants.sort_unstable();
+
+    assert!(
+        discriminants.windows(2).all(|pair| pair[0] != pair[1]),
+        "Error variants must have unique numeric discriminants: {discriminants:?}"
+    );
+}
+
 // ---------------------------------------------------------------- auth
 //
 // Only the rejection paths are unit-tested here. The accept path calls
