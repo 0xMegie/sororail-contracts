@@ -377,6 +377,22 @@ fn create_rejects_identical_sender_and_recipient() {
     );
 }
 
+/// A self-stream is refused before any funds move, and leaves no stream behind.
+#[test]
+fn self_stream_is_refused_without_moving_funds() {
+    let te = TestEnv::at(START);
+    let (token, sender) = te.make_token(MINT);
+    let env = te.env;
+    let client = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    assert_eq!(
+        client.try_create(&sender, &sender, &token.address, &RATE, &START, &STOP, &true),
+        Err(Ok(Error::IdenticalParties))
+    );
+    assert_eq!(token.balance(&sender), MINT);
+    assert_eq!(token.balance(&client.address), 0);
+    assert_eq!(client.try_get(), Err(Ok(Error::NotInitialized)));
+}
+
 /// `create` saves the stream before pulling funds. If the token transfer
 /// fails, the host reverts the whole invocation — including that save — so a
 /// later `get` still sees `NotInitialized`.

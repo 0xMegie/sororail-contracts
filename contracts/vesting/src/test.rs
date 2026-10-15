@@ -315,6 +315,54 @@ fn long_duration_large_total_stays_inside_documented_safe_range() {
 
 // ------------------------------------------------------------------ create
 
+// ------------------------------------------------------- schedule view
+
+fn checkpoints(f: &Fixture) -> std::vec::Vec<(u64, i128)> {
+    f.client
+        .schedule()
+        .iter()
+        .map(|c| (c.at, c.vested))
+        .collect()
+}
+
+#[test]
+fn schedule_lists_start_cliff_and_end_for_a_cliffed_grant() {
+    let f = Fixture::new(true);
+    assert_eq!(
+        checkpoints(&f),
+        vec![(START, 0), (START + 100, 100_000), (START + 1_000, TOTAL)]
+    );
+}
+
+#[test]
+fn schedule_with_no_cliff_is_start_and_end() {
+    let f = Fixture::with_schedule(true, 0, DURATION);
+    assert_eq!(checkpoints(&f), vec![(START, 0), (START + DURATION, TOTAL)]);
+}
+
+#[test]
+fn schedule_with_cliff_equal_to_duration_is_start_and_end() {
+    let f = Fixture::with_schedule(true, DURATION, DURATION);
+    assert_eq!(checkpoints(&f), vec![(START, 0), (START + DURATION, TOTAL)]);
+}
+
+#[test]
+fn schedule_matches_vested_amount_at_every_checkpoint() {
+    let f = Fixture::new(true);
+    for (at, vested) in checkpoints(&f) {
+        assert_eq!(f.client.vested_amount(&at), vested, "at {at}");
+    }
+}
+
+#[test]
+fn schedule_is_unchanged_by_revocation() {
+    let f = Fixture::new(true);
+    let before = checkpoints(&f);
+    f.at(START + 500);
+    f.client.revoke();
+    assert_eq!(checkpoints(&f), before);
+}
+
 #[test]
 fn create_funds_the_whole_grant_up_front() {
     let f = Fixture::new(true);
@@ -465,6 +513,31 @@ fn create_rejects_identical_grantor_and_beneficiary() {
         c.try_create(&party, &party, &token, &TOTAL, &START, &CLIFF, &DURATION, &true),
         Err(Ok(Error::IdenticalParties))
     );
+}
+
+/// A self-grant is refused before any funds move, and leaves no grant behind.
+#[test]
+fn self_grant_is_refused_without_moving_funds() {
+    let te = TestEnv::at(START);
+    let (token, grantor) = te.make_token(MINT);
+    let env = te.env;
+    let client = VestingContractClient::new(&env, &env.register(VestingContract, ()));
+    assert_eq!(
+        client.try_create(
+            &grantor,
+            &grantor,
+            &token.address,
+            &TOTAL,
+            &START,
+            &CLIFF,
+            &DURATION,
+            &true
+        ),
+        Err(Ok(Error::IdenticalParties))
+    );
+    assert_eq!(token.balance(&grantor), MINT);
+    assert_eq!(token.balance(&client.address), 0);
+    assert_eq!(client.try_get(), Err(Ok(Error::NotInitialized)));
 }
 
 /// `create` persists the grant before the token pull. A failed transfer must

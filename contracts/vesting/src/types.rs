@@ -1,5 +1,18 @@
-use soroban_sdk::{contracttype, Address};
+use soroban_sdk::{contracttype, Address, Env, Vec};
 use sororail_common::{math, Error};
+
+/// One corner of the vesting schedule: the total vested at a moment.
+///
+/// Returned by `schedule`. The planned amount, so it is unaffected by
+/// revocation.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Checkpoint {
+    /// Ledger timestamp of this corner.
+    pub at: u64,
+    /// Total vested as of `at` on the schedule as created.
+    pub vested: i128,
+}
 
 /// A vesting grant. One per deployed contract instance.
 ///
@@ -57,50 +70,91 @@ impl Grant {
     /// # Overflow ceiling
     ///
     /// This function computes `total * elapsed / duration` using [`math::mul_div`],
-    /// which errors on overflow rather than wrapping. For a given duration, the
-    /// maximum safe `total` is approximately `i128::MAX / duration_in_seconds`.
+    /// which errors on overflow rather than wrapping. The overflow risk is on
+    /// the intermediate product `total * elapsed`, not on `total` alone: at
+    /// the midpoint of the schedule, `elapsed` is about half the duration, so
+    /// the maximum safe `total` is approximately `i128::MAX / (duration / 2)`.
     ///
-    /// For example, with a 10-year vesting duration (~315,576,000 seconds), the
-    /// maximum total before `Overflow` is roughly 29 million tokens. Integrators
-    /// should size their token's decimals and supply to stay within this limit:
-    /// a token with 18 decimal places has a per-vesting-grant ceiling of about
-    /// 29 femto-tokens per second of duration, or ~1 million base units for 10 years.
+    /// For example, with a 10-year vesting duration (~315,576,000 seconds),
+    /// `elapsed` reaches ~157,788,000 at the midpoint, so `total` can be as
+    /// large as roughly `i128::MAX / 157,788,000` (~1.08e30) before
+    /// `Overflow` -- many orders of magnitude above any realistic token
+    /// supply, even at 18 decimal places.
     pub fn vested_amount(&self, at: u64) -> Result<i128, Error> {
         let effective = match self.revoked_at {
             Some(revoked) => at.min(revoked),
             None => at,
         };
+        self.planned_vested(effective)
+    }
 
+    /// Vested as of `at` on the schedule as created, ignoring revocation.
+    ///
+    /// Shared by [`Self::vested_amount`] (which clamps `at` first) and
+    /// [`Self::checkpoints`] (which must report the planned schedule even for
+    /// a revoked grant).
+    fn planned_vested(&self, at: u64) -> Result<i128, Error> {
         // Nothing before the cliff.
         let cliff_at = self.start.saturating_add(self.cliff);
-        if effective < cliff_at {
+        if at < cliff_at {
             return Ok(0);
         }
         // Everything at the end.
         let end = self.end_at();
-        if effective >= end {
+        if at >= end {
             return Ok(self.total);
         }
 
-        // Linear in between. `duration` is non-zero because `end > effective
+        // Linear in between. `duration` is non-zero because `end > at
         // >= cliff_at >= start` implies `end > start`. `create` rejects
         // `duration == 0`, so this holds for every stored grant.
         debug_assert!(
             self.duration > 0,
             "linear vesting branch requires non-zero duration"
         );
-        // `effective - self.start` cannot underflow: `effective >= cliff_at
-        // >= start` always holds (the branches above return before this
-        // point whenever `effective < cliff_at`), so `math::sub` here is
-        // defense-in-depth rather than a path that can actually return
-        // `Underflow`. The `saturating_add` calls above are what make
-        // `cliff_at`/`end` well-defined rather than panicking on an
-        // unvalidated `Grant`, but `VestingContract::create` additionally
-        // rejects any `start + duration` that would need that saturation, so
-        // for a grant created through the contract, `end` is always the
-        // true, non-saturated sum.
-        let elapsed = math::sub(i128::from(effective), i128::from(self.start))?;
+        // `at - self.start` cannot underflow: `at >= cliff_at >= start`
+        // always holds (the branches above return before this point
+        // whenever `at < cliff_at`), so `math::sub` here is defense-in-depth
+        // rather than a path that can actually return `Underflow`. The
+        // `saturating_add` calls above are what make `cliff_at`/`end`
+        // well-defined rather than panicking on an unvalidated `Grant`, but
+        // `VestingContract::create` additionally rejects any `start +
+        // duration` that would need that saturation, so for a grant created
+        // through the contract, `end` is always the true, non-saturated sum.
+        let elapsed = math::sub(i128::from(at), i128::from(self.start))?;
         math::mul_div(self.total, elapsed, i128::from(self.duration))
+    }
+
+    /// The schedule as its corner points, in ascending time order.
+    ///
+    /// Vesting is zero up to the cliff, steps to the proportion vested at the
+    /// cliff, then rises linearly to `total` at `end_at`. Those corners are the
+    /// only points needed: a client draws a straight line between consecutive
+    /// checkpoints and gets the exact schedule. Reports the planned schedule
+    /// as created, so a revoked grant still shows its full curve.
+    ///
+    /// Points that coincide are emitted once: `cliff == 0` drops the cliff
+    /// point, and `cliff == duration` drops the duplicate end point.
+    pub fn checkpoints(&self, env: &Env) -> Result<Vec<Checkpoint>, Error> {
+        let cliff_at = self.cliff_at();
+        let end = self.end_at();
+
+        let mut points = Vec::new(env);
+        points.push_back(self.checkpoint(self.start)?);
+        if cliff_at > self.start {
+            points.push_back(self.checkpoint(cliff_at)?);
+        }
+        if end > cliff_at {
+            points.push_back(self.checkpoint(end)?);
+        }
+        Ok(points)
+    }
+
+    fn checkpoint(&self, at: u64) -> Result<Checkpoint, Error> {
+        Ok(Checkpoint {
+            at,
+            vested: self.planned_vested(at)?,
+        })
     }
 
     /// Vested but not yet claimed, as of `at`.

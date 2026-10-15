@@ -171,6 +171,8 @@ Scheduled release against a schedule, with a cliff.
 - `claim()` — beneficiary withdraws vested-but-unclaimed
 - `revoke()` — grantor reclaims unvested; vested portion stays claimable
 - `vested_amount(at: u64)` — pure view, testable in isolation
+- `schedule()` — the schedule as a list of `Checkpoint { at, vested }` corners: start, cliff, and end (cliff and end collapse when they coincide). Linear between consecutive checkpoints. Reports the schedule as created, so it is unaffected by revocation.
+- `create` rejects `grantor == beneficiary` with `IdenticalParties` before any funds move.
 - Linear vesting after cliff. Nothing claimable before cliff. Fully vested at `start + duration`.
 - `cliff` and `duration` are spans in seconds from `start`, not absolute timestamps. `cliff == duration` is a legal all-or-nothing unlock.
 - Grants are immutable once created — no `top_up` or `extend` like `stream` provides. Issue a new grant for additional allocations.
@@ -179,7 +181,7 @@ Scheduled release against a schedule, with a cliff.
 
 Pull-based authorization for subscriptions. The payer authorizes a cap and cadence; the payee pulls within it.
 
-- `authorize(payer, payee, token, amount_per_period, period_seconds, max_periods: Option<u32>)`
+- `authorize(payer, payee, token, amount_per_period, period_seconds, max_periods: Option<u32>)` — rejects `payer == payee` with `IdenticalParties`
 - `charge()` — callable by payee, at most once per elapsed period
 - `cancel(caller)` — callable by either party, effective immediately
 - `next_chargeable_at()` — view

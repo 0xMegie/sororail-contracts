@@ -151,6 +151,20 @@ fn authorize_rejects_a_zero_cap() {
 }
 
 #[test]
+fn authorize_rejects_identical_payer_and_payee() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let c = RecurringContractClient::new(&env, &env.register(RecurringContract, ()));
+    let party = Address::generate(&env);
+    let token = Address::generate(&env);
+    assert_eq!(
+        c.try_authorize(&party, &party, &token, &AMOUNT, &PERIOD, &None),
+        Err(Ok(Error::IdenticalParties))
+    );
+    assert_eq!(c.try_get(), Err(Ok(Error::NotInitialized)));
+}
+
+#[test]
 fn authorize_rejects_a_second_call() {
     let f = Fixture::new(None);
     assert_eq!(

@@ -1,7 +1,10 @@
-use soroban_sdk::{contract, contractimpl, token, Address, Env};
+use soroban_sdk::{contract, contractimpl, token, Address, Env, Vec};
 use sororail_common::{auth, math, Error};
 
-use crate::{events, storage, types::Grant};
+use crate::{
+    events, storage,
+    types::{Checkpoint, Grant},
+};
 
 #[contract]
 pub struct VestingContract;
@@ -183,6 +186,16 @@ impl VestingContract {
     pub fn claimable(env: Env) -> Result<i128, Error> {
         let grant = storage::load_view(&env)?;
         grant.claimable_at(env.ledger().timestamp())
+    }
+
+    /// The schedule as a list of checkpoints, in ascending time order.
+    ///
+    /// Lets a client draw the schedule without recomputing it. Between two
+    /// consecutive checkpoints vesting is linear, so the list is the exact
+    /// curve. Reports the schedule as created; use `vested_amount` for the
+    /// revocation-aware figure.
+    pub fn schedule(env: Env) -> Result<Vec<Checkpoint>, Error> {
+        storage::load_view(&env)?.checkpoints(&env)
     }
 
     /// What the contract still holds for this grant.
