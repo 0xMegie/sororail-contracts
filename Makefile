@@ -2,7 +2,7 @@ WASM_TARGET := wasm32v1-none
 WASM_DIR    := target/$(WASM_TARGET)/release
 CONTRACTS   := escrow stream vesting recurring batch_payout
 
-.PHONY: all build test fmt fmt-check lint audit optimize specs clean ci coverage
+.PHONY: all build test fmt fmt-check lint audit optimize specs clean ci coverage check-error-docs
 
 all: build test
 
@@ -57,7 +57,10 @@ specs: build
 	done
 	@echo "specs written to dist/specs/"
 
-ci: fmt-check lint test build
+check-error-docs:
+	./scripts/check_error_docs.sh
+
+ci: fmt-check lint test build check-error-docs
 
 # Matches .github/workflows/ci.yml coverage job (lines / regions / functions).
 coverage:

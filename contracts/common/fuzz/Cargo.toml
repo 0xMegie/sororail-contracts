@@ -1,0 +1,25 @@
+[package]
+name = "sororail-common-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+# Detaches this crate from the root workspace, same as every cargo-fuzz
+# project: it depends on nightly + libfuzzer-sys and must not affect the
+# stable, wasm-targeted build of the main workspace.
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+num-bigint = "0.4"
+sororail-common = { path = ".." }
+
+[[bin]]
+name = "fuzz_mul_div"
+path = "fuzz_targets/fuzz_mul_div.rs"
+test = false
+doc = false
+bench = false

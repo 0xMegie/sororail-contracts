@@ -136,6 +136,22 @@ Rules of thumb:
 - **CI must be green to merge.** No exceptions for maintainers.
 - **Formatting:** `cargo fmt`. Lints: `cargo clippy`, warnings denied.
 
+## Fuzzing
+
+`contracts/common/fuzz` holds differential fuzz targets for
+`sororail_common::math`, run with [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz)
+on nightly (it is intentionally outside the main workspace — see that
+crate's `Cargo.toml`):
+
+```bash
+cargo install cargo-fuzz
+cd contracts/common/fuzz
+cargo +nightly fuzz run fuzz_mul_div
+```
+
+Not run in CI (fuzzing is open-ended, not pass/fail); run it locally after
+touching `math.rs`.
+
 ## Security
 
 Do not report vulnerabilities through public issues. See [SECURITY.md](SECURITY.md).
