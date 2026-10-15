@@ -15,6 +15,8 @@ impl RecurringContract {
     /// call, so a subscription never bills at the moment of signup without the
     /// payer seeing a period pass.
     ///
+    /// `payer` and `payee` must differ; a self-authorization is rejected.
+    ///
     /// **This call does not by itself let the payee take anything.** The payer
     /// must also `approve` this contract as a spender on the token for at
     /// least the amount they intend to allow. That allowance is the real cap:
@@ -30,6 +32,9 @@ impl RecurringContract {
     ) -> Result<(), Error> {
         if storage::is_initialized(&env) {
             return Err(Error::AlreadyInitialized);
+        }
+        if payer == payee {
+            return Err(Error::IdenticalParties);
         }
         math::require_positive(amount_per_period)?;
         if period_seconds == 0 {

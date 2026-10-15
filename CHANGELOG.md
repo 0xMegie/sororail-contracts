@@ -12,8 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Workspace test `tests/tests/event_topics.rs` asserting every `#[contractevent]` declares exactly `[<crate name>, <snake_case action>]` topics (#64).
 - SPEC.md "Cross-contract design conventions": when an entry point takes a `caller` argument vs. calling `require_auth` on a fixed party (#63), and when a lifecycle is a `State` enum vs. an optional timestamp (#66).
 - CONTRIBUTING.md "Choosing an authorization pattern" (#63).
+- `vesting::schedule()` view returning the schedule as a list of `Checkpoint { at, vested }` corners (start, cliff, end), so clients can render it without recomputing (#315).
 
 ### Changed
+
+- `recurring::authorize` rejects `payer == payee` with `IdenticalParties` (#314). Previously a self-subscription was accepted; it moved no value but is now refused up front.
+- Regression tests confirm `vesting::create` and `stream::create` refuse identical parties before any funds move and leave no record behind (#312, #313). The checks themselves predate this change.
 
 - Every contract's `errors.rs` now documents which shared variants it never returns, and why (#67). The `recurring` note wrongly claimed `Unauthorized` never appears and has been corrected. `escrow` now lists `DeadlinePassed`, `Overflow` and `EscrowNotCancellable`, `recurring` lists `InvalidTimeRange` and `Overflow`, and `batch_payout` lists `IdenticalParties`, all of which were raised but undocumented.
 

@@ -8,6 +8,7 @@
 //! |---|---|
 //! | [`Error::AlreadyInitialized`] | `authorize` on an initialized instance |
 //! | [`Error::NotInitialized`] | any entry point before `authorize` |
+//! | [`Error::IdenticalParties`] | `authorize` with `payer == payee` |
 //! | [`Error::Unauthorized`] | `cancel` by someone who is neither party |
 //! | [`Error::InvalidAmount`] | non-positive `amount_per_period`, or `max_periods == Some(0)` |
 //! | [`Error::InvalidDuration`] | zero `period_seconds` |
@@ -41,8 +42,6 @@
 //! - `InvalidState` -- the lifecycle is a single `cancelled` flag plus the
 //!   `max_periods` cap, each with its own specific variant
 //!   (`RecurringCancelled`, `RecurringExhausted`).
-//! - `IdenticalParties` -- `authorize` does not reject `payer == payee`. A
-//!   self-subscription moves no value, so it is pointless rather than unsafe.
 //! - `Underflow`, `DivisionByZero`, `InvalidBasisPoints` -- no subtraction,
 //!   division or basis-point math is performed on balances.
 
