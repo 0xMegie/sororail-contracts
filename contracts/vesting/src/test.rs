@@ -50,7 +50,7 @@ impl Fixture<'_> {
         let (token, grantor) = te.make_token(MINT);
         let token_address = token.address.clone();
         let beneficiary = te.make_address();
-        let env = te.env;
+        let env = te.env().clone();
 
         let client = VestingContractClient::new(&env, &env.register(VestingContract, ()));
         client.create(
@@ -459,7 +459,7 @@ fn create_rejects_identical_grantor_and_beneficiary() {
 fn self_grant_is_refused_without_moving_funds() {
     let te = TestEnv::at(START);
     let (token, grantor) = te.make_token(MINT);
-    let env = te.env;
+    let env = te.env().clone();
     let client = VestingContractClient::new(&env, &env.register(VestingContract, ()));
     assert_eq!(
         client.try_create(
@@ -486,7 +486,7 @@ fn create_with_contract_as_beneficiary_succeeds() {
     let te = TestEnv::at(START);
     let (token_client, grantor) = te.make_token(MINT);
     let token = token_client.address.clone();
-    let env = te.env;
+    let env = te.env().clone();
     let contract_id = env.register(VestingContract, ());
     let client = VestingContractClient::new(&env, &contract_id);
 
@@ -512,7 +512,7 @@ fn create_rejects_multiple_invalid_args_in_order() {
     let (token_client, grantor) = te.make_token(MINT);
     let token = token_client.address.clone();
     let beneficiary = te.make_address();
-    let env = te.env;
+    let env = te.env().clone();
 
     let contract_id = env.register(VestingContract, ());
     let client = VestingContractClient::new(&env, &contract_id);
@@ -583,7 +583,7 @@ fn create_reverts_cleanly_when_grantor_cannot_fund() {
     let (token_client, grantor) = te.make_token(1);
     let token = token_client.address.clone();
     let beneficiary = te.make_address();
-    let env = te.env;
+    let env = te.env().clone();
     let c = VestingContractClient::new(&env, &env.register(VestingContract, ()));
 
     assert!(c
@@ -612,7 +612,7 @@ fn create_emits_the_created_event() {
     let (token_client, grantor) = te.make_token(MINT);
     let token_address = token_client.address.clone();
     let beneficiary = te.make_address();
-    let env = te.env;
+    let env = te.env().clone();
 
     let client = VestingContractClient::new(&env, &env.register(VestingContract, ()));
     client.create(
