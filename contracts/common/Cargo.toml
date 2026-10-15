@@ -8,8 +8,21 @@ repository.workspace = true
 homepage.workspace = true
 rust-version.workspace = true
 
+[lib]
+doctest = true
+
+[features]
+# Exposes `sororail_common::testutils` — lightweight test-environment helpers
+# (token minting, address generation, ledger time control). Depend on this
+# feature in the `[dev-dependencies]` section of every contract that uses it.
+# Never enabled in production builds.
+testutils = ["soroban-sdk/testutils"]
+
 [dependencies]
 soroban-sdk = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+
+[lints]
+workspace = true

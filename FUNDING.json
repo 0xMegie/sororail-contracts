@@ -3,5 +3,9 @@
     "ethereum": {
       "ownedBy": "0x0000000000000000000000000000000000000000"
     }
+  },
+  "status": {
+    "claiming": "deferred",
+    "reason": "The owner address is intentionally unset until the Sororail governance wallet is finalized; do not treat the zero address as a claimable Drips owner."
   }
 }

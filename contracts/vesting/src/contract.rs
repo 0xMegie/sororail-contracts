@@ -25,6 +25,18 @@ impl VestingContract {
     ///
     /// The full total is pulled from the grantor immediately -- a grant is
     /// never partially funded.
+    ///
+    /// `grantor` and `beneficiary` must differ; a self-grant is rejected.
+    ///
+    /// # Why positional arguments (not a `CreateGrantParams` struct)
+    ///
+    /// Soroban does support a single `#[contracttype]` struct parameter, and
+    /// that would silence this lint. Positional arguments were kept anyway so
+    /// the on-chain ABI stays a flat argument list — the same shape the
+    /// TypeScript SDK's uniform build → simulate → sign → send → confirm
+    /// surface (SPEC.md) will bind without introducing a nested params object
+    /// per entry point. Same decision as `stream::create`; revisit only if the
+    /// SDK deliberately adopts struct params across every contract.
     #[allow(clippy::too_many_arguments)]
     pub fn create(
         env: Env,
@@ -39,6 +51,9 @@ impl VestingContract {
     ) -> Result<(), Error> {
         if storage::is_initialized(&env) {
             return Err(Error::AlreadyInitialized);
+        }
+        if grantor == beneficiary {
+            return Err(Error::IdenticalParties);
         }
         math::require_positive(total)?;
         if duration == 0 {
@@ -161,23 +176,30 @@ impl VestingContract {
 
     /// Total vested as of `at`, whether claimed or not. Pure view.
     pub fn vested_amount(env: Env, at: u64) -> Result<i128, Error> {
-        storage::load(&env)?.vested_amount(at)
+        storage::load_view(&env)?.vested_amount(at)
     }
 
     /// Vested but not yet claimed, as of now.
     pub fn claimable(env: Env) -> Result<i128, Error> {
-        let grant = storage::load(&env)?;
+        let grant = storage::load_view(&env)?;
         grant.claimable_at(env.ledger().timestamp())
     }
 
     /// What the contract still holds for this grant.
     pub fn remaining(env: Env) -> Result<i128, Error> {
-        storage::load(&env)?.remaining()
+        storage::load_view(&env)?.remaining()
+    }
+
+    /// Extends the instance TTL for a long-lived grant without changing it.
+    pub fn bump(env: Env) -> Result<(), Error> {
+        storage::load_view(&env)?;
+        sororail_common::storage::extend_instance(&env);
+        Ok(())
     }
 
     /// The full grant record.
     pub fn get(env: Env) -> Result<Grant, Error> {
-        storage::load(&env)
+        storage::load_view(&env)
     }
 }
 
@@ -187,6 +209,7 @@ impl VestingContract {
     ///
     /// Always called after the state change has been persisted.
     fn pay(env: &Env, grant: &Grant, to: &Address, amount: i128) {
+        debug_assert!(amount > 0, "pay requires a positive amount");
         token::TokenClient::new(env, &grant.token).transfer(
             &env.current_contract_address(),
             to,

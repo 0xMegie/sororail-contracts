@@ -58,13 +58,26 @@ pub struct Disputed {
 }
 
 /// The arbiter split the funds between the parties.
+///
+/// `split_bps` is the beneficiary's share: `0` is a full win for the depositor,
+/// `10000` is a full win for the beneficiary, and values in between are a
+/// genuine split. There is no separate event for a full win — indexers should
+/// treat the boundary values as the full-win cases of this same event.
 #[contractevent(topics = ["escrow", "resolved"])]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resolved {
     #[topic]
     pub arbiter: Address,
-    /// Share paid to the beneficiary, in basis points.
+    /// Share paid to the beneficiary, in basis points (`0`..=`10000`).
     pub split_bps: u32,
     pub to_beneficiary: i128,
     pub to_depositor: i128,
+}
+
+/// The depositor cancelled a Created escrow before funding it.
+#[contractevent(topics = ["escrow", "cancelled"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Cancelled {
+    #[topic]
+    pub depositor: Address,
 }

@@ -5,63 +5,216 @@ on:
     branches: [main]
   pull_request:
 
+# Lint policy (deny warnings, checked arithmetic) lives in [workspace.lints]
+# in Cargo.toml, not in RUSTFLAGS, so local `cargo clippy` matches CI.
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: -D warnings
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege: jobs get the repo default scope unless overridden below.
+# Only the audit job gets more (checks: write for rustsec/audit-check).
+permissions:
+  contents: read
+
 jobs:
+  conventional-commits:
+    name: conventional commits
+    runs-on: ubuntu-latest
+    # PR title becomes the squash-merge commit, so that is what we validate.
+    # SPEC.md and CONTRIBUTING.md require Conventional Commits.
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@e32d7e603df1aa1ba07e981f2a23455dee596825 # v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   check:
     name: fmt / clippy / test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # Install the channel from rust-toolchain.toml (1.97.1), not floating
+      # `dtolnay/rust-toolchain@stable`. Spec/CONTRIBUTING pin that file as
+      # source of truth so local cargo and CI cannot diverge on clippy or
+      # inference (issue #53).
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
+          toolchain: "1.97.1"
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@nextest
+      - name: verify rustc matches rust-toolchain.toml
+        run: |
+          expected="$(sed -n 's/^channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          actual="$(rustc -V | awk '{print $2}')"
+          echo "rust-toolchain.toml channel=${expected}"
+          echo "rustc --version patch=${actual}"
+          test "${actual}" = "${expected}"
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: taiki-e/install-action@4765db214858792ed289a2b5e543daf93d682a48 # nextest
 
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo clippy --workspace --all-targets
       - run: cargo nextest run --workspace
+
+  doc:
+    name: cargo doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: "1.97.1"
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - run: cargo doc --no-deps --workspace
+        env:
+          RUSTDOCFLAGS: "-D warnings"
 
   build:
     name: wasm build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
+          toolchain: "1.97.1"
           targets: wasm32v1-none
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
       # sororail-integration-tests is host-only (needs std); it is excluded
       # here rather than being allowed to fail the wasm build.
       - run: cargo build --workspace --exclude sororail-integration-tests --target wasm32v1-none --release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wasm
           path: target/wasm32v1-none/release/*.wasm
+      # Fail if any contract wasm exceeds the Soroban size budget (256 KiB).
+      - name: check wasm sizes
+        run: |
+          MAX_BYTES=$((256 * 1024))
+          fail=0
+          for f in target/wasm32v1-none/release/sororail_*.wasm; do
+            sz=$(stat -c%s "$f")
+            name=$(basename "$f")
+            echo "$name: $sz bytes"
+            if [ "$sz" -gt "$MAX_BYTES" ]; then
+              echo "::error file=$f::${name} is ${sz} bytes, exceeds ${MAX_BYTES} byte limit"
+              fail=1
+            fi
+          done
+          exit "$fail"
+      # Rust tests never load the contract spec, so a broken one (e.g. the
+      # `Payments` alias in DEPLOYMENTS.md) passes everything above. `make
+      # specs` generates each interface and fails if it does not parse or
+      # references an undefined type. Action tag == CLI version; keep in step
+      # with DEPLOYMENTS.md.
+      - uses: stellar/stellar-cli@8e402ea28202950b272fbabc34caad4d2f64fe87 # v27.1.0
+      - run: make specs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: specs
+          path: dist/specs/*.json
+      # Guard against reintroducing a `pub type` alias in a `#[contractimpl]`
+      # entry-point signature. `#[contractimpl]` resolves types syntactically,
+      # not semantically: an alias in argument or return position emits a spec
+      # referencing a type that does not exist, which silently breaks every
+      # client while all Rust tests pass (see DEPLOYMENTS.md § "One bug this
+      # deployment caught" and contracts/batch_payout/src/types.rs).
+      #
+      # The check:
+      #   1. Collect every `pub type Foo = …` alias defined in each
+      #      contract's own source files.
+      #   2. For each such alias, scan the contract's `contract.rs` for any
+      #      use of that name in a function signature (fn … Foo … or -> Foo).
+      #   3. Fail with a clear message if any match is found.
+      #
+      # This is intentionally conservative: it only looks at `contract.rs`
+      # (where `#[contractimpl]` blocks live) and only at names that are
+      # actually aliased in the same crate, so it produces no false positives
+      # for types from `soroban_sdk` or external crates.
+      - name: check no pub-type aliases in contractimpl signatures
+        shell: bash
+        run: |
+          fail=0
+          for contract_dir in contracts/*/; do
+            contract_rs="${contract_dir}src/contract.rs"
+            [ -f "$contract_rs" ] || continue
 
-  coverage:
-    name: coverage (>=90%)
+            # Collect all `pub type Alias` names defined anywhere in this crate.
+            aliases=$(grep -rh --include="*.rs" \
+              -oP '(?<=^pub type )\w+' "$contract_dir" 2>/dev/null || true)
+            [ -z "$aliases" ] && continue
+
+            for alias in $aliases; do
+              # Match the alias as a word in a fn signature line:
+              #   fn foo(bar: Alias, …)  or  ) -> Alias
+              # We check any line containing `fn ` or `->` in contract.rs.
+              if grep -nP "\bfn\b.*\b${alias}\b|\->\s*${alias}\b" \
+                  "$contract_rs" > /dev/null 2>&1; then
+                echo "::error file=${contract_rs}::pub type alias '${alias}' appears in a #[contractimpl] signature in ${contract_rs}. Spell the type out in full — see contracts/batch_payout/src/types.rs for why."
+                fail=1
+              fi
+            done
+          done
+          exit "$fail"
+
+  msrv:
+    name: msrv (1.91)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@cargo-llvm-cov
-      - uses: taiki-e/install-action@nextest
-      - run: cargo llvm-cov nextest --workspace --fail-under-lines 90
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # stable
+        with:
+          # Must equal rust-version in Cargo.toml.
+          toolchain: "1.91"
+          targets: wasm32v1-none
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - run: cargo check --workspace --all-targets --locked
+      - run: cargo check --workspace --exclude sororail-integration-tests --target wasm32v1-none --locked
+
+  coverage:
+    name: coverage (lines≥90, regions≥75, functions≥80)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          # Must match rust-toolchain.toml (issue #53).
+          toolchain: "1.97.1"
+      - name: verify rustc matches rust-toolchain.toml
+        run: |
+          expected="$(sed -n 's/^channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          actual="$(rustc -V | awk '{print $2}')"
+          test "${actual}" = "${expected}"
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: taiki-e/install-action@ab4220e067fa624f7930084426dbfb7440a52829 # cargo-llvm-cov
+      - uses: taiki-e/install-action@4765db214858792ed289a2b5e543daf93d682a48 # nextest
+      # Line coverage alone can miss error-path branches (issue #52). Gate
+      # regions and functions as well; keep line threshold at SPEC.md's 90%.
+      - run: >
+          cargo llvm-cov nextest --workspace
+          --fail-under-lines 90
+          --fail-under-regions 75
+          --fail-under-functions 80
+      - name: audit Error::* variants are referenced in tests
+        run: bash scripts/audit-error-variant-coverage.sh
 
   audit:
     name: cargo audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # Failure policy (see SECURITY.md, "Automated checks"): audit-check has
+      # no severity threshold. Any vulnerability advisory fails this job,
+      # whatever its CVSS severity. Informational advisories (unmaintained,
+      # unsound, notice) and yanked crates are reported as warnings only.
+      # To ignore an advisory, add its RUSTSEC ID to an `ignore:` input here
+      # with a comment explaining why, and update SECURITY.md.
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

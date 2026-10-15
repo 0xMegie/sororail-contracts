@@ -48,3 +48,12 @@
 //!   Do not add a third `#[topic]` field to a keyed event.
 //! - Amounts are emitted as data, never as topics. They are not useful to
 //!   index and they bloat the topic list.
+//!
+//! # Enforcement
+//!
+//! The fixed-topic rules are checked mechanically by
+//! `tests/tests/event_topics.rs`, which scans every `contracts/<crate>/src`
+//! tree and fails CI if a `#[contractevent]` does not declare exactly
+//! `[<crate directory name>, <snake_case action>]`. A new contract crate is
+//! covered automatically, so its directory name must be the short name used
+//! as the first topic.

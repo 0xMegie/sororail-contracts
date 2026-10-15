@@ -40,6 +40,10 @@ pub struct Authorization {
     /// The earliest ledger timestamp at which the next charge may be taken.
     pub next_chargeable_at: u64,
     /// Whether either party has cancelled.
+    ///
+    /// A plain flag rather than a `State` enum or a timestamp: the lifecycle
+    /// is binary and nothing is computed from when it ended. See "Lifecycle
+    /// modeling" in SPEC.md.
     pub cancelled: bool,
 }
 

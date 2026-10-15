@@ -1,0 +1,39 @@
+name: Feature / change request
+description: Propose a scoped contract or tooling change.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check SPEC.md non-goals before proposing work. Prefer a draft PR early once an issue is claimed.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Concrete change, affected crates/paths, and acceptance criteria.
+    validations:
+      required: true
+  - type: textarea
+    id: testing
+    attributes:
+      label: How to test
+      description: Auth cases, arithmetic edges, and any conservation invariants.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Spec fit
+      options:
+        - label: I read SPEC.md and this is not listed as a non-goal
+          required: true
+        - label: I will not renumber or remove released Error variants
+          required: true

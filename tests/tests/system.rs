@@ -11,6 +11,8 @@
 //! test ends by summing every balance — every party and every contract
 //! address — and asserting it equals what was minted.
 
+#![allow(clippy::arithmetic_side_effects)]
+
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     token::{StellarAssetClient, TokenClient},
@@ -187,7 +189,7 @@ fn an_operations_month_conserves_every_token() {
     s.stream.withdraw(&None);
     s.assert_nothing_lost(&parties);
     assert_eq!(s.balance(&vendor), 99_000);
-    assert_eq!(s.balance(&dave), MONTH as i128);
+    assert_eq!(s.balance(&dave), i128::from(MONTH));
 
     // The grant is still inside its cliff.
     assert_eq!(s.vesting.claimable(), 0);
@@ -204,7 +206,7 @@ fn an_operations_month_conserves_every_token() {
     s.assert_nothing_lost(&parties);
 
     // The stream paid out its full year and no more.
-    assert_eq!(s.balance(&dave), YEAR as i128);
+    assert_eq!(s.balance(&dave), i128::from(YEAR));
     assert_eq!(s.stream.remaining(), 0);
 
     // --- the employee leaves; the unvested remainder comes back ---
@@ -261,6 +263,34 @@ fn contracts_sharing_a_token_stay_isolated() {
     s.escrow.release(&s.employer);
     assert_eq!(s.balance(&beneficiary), 50_000);
     assert_eq!(s.balance(&s.stream.address), 0);
+    s.assert_nothing_lost(&parties);
+}
+
+/// Attempting to cancel a non-cancellable stream should fail.
+#[test]
+fn cannot_cancel_non_cancellable_stream() {
+    let s = System::new();
+    let recipient = Address::generate(&s.env);
+    let parties = [&recipient];
+
+    // Create a non-cancellable stream
+    s.stream.create(
+        &s.employer,
+        &recipient,
+        &s.token.address,
+        &10,
+        &START,
+        &(START + 1_000),
+        &false, // Not cancellable
+    );
+    s.assert_nothing_lost(&parties);
+
+    // Attempt to cancel the stream and assert the error
+    let result = s.stream.try_cancel();
+    assert_eq!(
+        result,
+        Err(Ok(sororail_common::Error::StreamNotCancellable))
+    );
     s.assert_nothing_lost(&parties);
 }
 
@@ -381,6 +411,87 @@ fn a_full_size_batch_runs_within_a_populated_system() {
         assert_eq!(s.balance(&r), 100);
     }
 
-    let paid_out: i128 = 100 * sororail_batch_payout::MAX_RECIPIENTS as i128;
+    let paid_out: i128 = 100 * i128::from(sororail_batch_payout::MAX_RECIPIENTS);
     assert_eq!(s.balance(&s.employer), MINT - paid_out - 1_000);
+}
+
+/// Payroll workflow combining batch_payout for immediate multi-recipient payments
+/// and recurring for ongoing vendor subscriptions. Both operate on the same token
+/// and employer account, demonstrating the "Payroll (batch_payout + recurring)"
+/// feature from SPEC.md that uses both contracts in a real workflow.
+#[test]
+fn batch_and_recurring_payroll_workflow() {
+    let s = System::new();
+
+    let contractor_a = Address::generate(&s.env);
+    let contractor_b = Address::generate(&s.env);
+    let vendor = Address::generate(&s.env);
+    let parties = [&contractor_a, &contractor_b, &vendor];
+
+    // --- Immediate payroll via batch: pay multiple contractors at once ---
+    let payroll = vec![
+        &s.env,
+        Payment {
+            to: contractor_a.clone(),
+            amount: 1_000_000,
+        },
+        Payment {
+            to: contractor_b.clone(),
+            amount: 750_000,
+        },
+    ];
+    let receipt = s.batch.execute(&s.employer, &s.token.address, &payroll);
+    assert_eq!(receipt.total, 1_750_000);
+    s.assert_nothing_lost(&parties);
+
+    // --- Recurring subscription: employer authorizes vendor for monthly charges ---
+    // Same employer funding both the batch payroll and the vendor subscription
+    s.recurring.authorize(
+        &s.employer,
+        &vendor,
+        &s.token.address,
+        &100_000,
+        &MONTH,
+        &Some(12),
+    );
+    let expiry = s.env.ledger().sequence() + 500_000;
+    s.token
+        .approve(&s.employer, &s.recurring.address, &MINT, &expiry);
+    s.assert_nothing_lost(&parties);
+
+    // --- First month: vendor pulls subscription charge ---
+    s.at(START + MONTH);
+    s.recurring.charge();
+    assert_eq!(s.balance(&vendor), 100_000);
+    s.assert_nothing_lost(&parties);
+
+    // --- Second month: another batch payout for contractors, vendor charges again ---
+    s.at(START + MONTH * 2);
+    let bonus_payroll = vec![
+        &s.env,
+        Payment {
+            to: contractor_a.clone(),
+            amount: 250_000,
+        },
+        Payment {
+            to: contractor_b.clone(),
+            amount: 200_000,
+        },
+    ];
+    s.batch
+        .execute(&s.employer, &s.token.address, &bonus_payroll);
+    s.recurring.charge();
+    assert_eq!(s.balance(&vendor), 200_000);
+    s.assert_nothing_lost(&parties);
+
+    // Verify total conservation across batch and recurring contracts and parties
+    assert_eq!(
+        s.balance(&contractor_a)
+            + s.balance(&contractor_b)
+            + s.balance(&vendor)
+            + s.balance(&s.employer)
+            + s.balance(&s.batch.address)
+            + s.balance(&s.recurring.address),
+        MINT
+    );
 }

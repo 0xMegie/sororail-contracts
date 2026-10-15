@@ -83,13 +83,15 @@ impl RecurringContract {
     /// rather than banked -- see [`Authorization`] for why.
     pub fn charge(env: Env) -> Result<i128, Error> {
         let mut authorization = storage::load(&env)?;
+        // Require auth before state checks so unauthenticated callers cannot
+        // probe contract state via typed errors (CONTRIBUTING.md convention).
+        authorization.payee.require_auth();
         if authorization.cancelled {
             return Err(Error::RecurringCancelled);
         }
         if authorization.is_exhausted() {
             return Err(Error::RecurringExhausted);
         }
-        authorization.payee.require_auth();
 
         let now = env.ledger().timestamp();
         if now < authorization.next_chargeable_at {
@@ -153,22 +155,29 @@ impl RecurringContract {
     /// cancelled or exhausted; check [`Self::is_chargeable`] for whether a
     /// charge would actually succeed.
     pub fn next_chargeable_at(env: Env) -> Result<u64, Error> {
-        Ok(storage::load(&env)?.next_chargeable_at)
+        Ok(storage::load_view(&env)?.next_chargeable_at)
     }
 
     /// Whether a charge would succeed right now.
     pub fn is_chargeable(env: Env) -> Result<bool, Error> {
-        let authorization = storage::load(&env)?;
+        let authorization = storage::load_view(&env)?;
         Ok(authorization.is_chargeable_at(env.ledger().timestamp()))
     }
 
     /// Charges still permitted under the cap, if there is one.
     pub fn remaining_periods(env: Env) -> Result<Option<u32>, Error> {
-        Ok(storage::load(&env)?.remaining_periods())
+        Ok(storage::load_view(&env)?.remaining_periods())
+    }
+
+    /// Extends the instance TTL for a long-lived authorization without changing it.
+    pub fn bump(env: Env) -> Result<(), Error> {
+        storage::load_view(&env)?;
+        sororail_common::storage::extend_instance(&env);
+        Ok(())
     }
 
     /// The full authorization record.
     pub fn get(env: Env) -> Result<Authorization, Error> {
-        storage::load(&env)
+        storage::load_view(&env)
     }
 }

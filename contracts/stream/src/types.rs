@@ -77,7 +77,7 @@ impl Stream {
         if effective <= self.start {
             return Ok(0);
         }
-        let elapsed = (effective - self.start) as i128;
+        let elapsed = math::sub(i128::from(effective), i128::from(self.start))?;
         let accrued = math::mul(self.rate_per_second, elapsed)?;
         Ok(math::min(accrued, self.deposited))
     }
@@ -93,6 +93,10 @@ impl Stream {
     }
 
     /// Whether the stream has been cancelled.
+    ///
+    /// The lifecycle is binary and one-way, so it is modelled by the
+    /// `cancelled_at` timestamp (which accrual needs anyway) rather than a
+    /// `State` enum like escrow's. See "Lifecycle modeling" in SPEC.md.
     pub fn is_cancelled(&self) -> bool {
         self.cancelled_at.is_some()
     }

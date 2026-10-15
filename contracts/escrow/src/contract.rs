@@ -58,6 +58,26 @@ impl EscrowContract {
         Ok(())
     }
 
+    /// Cancels a Created escrow, returning control of the instance to the
+    /// deployer. Only the depositor may do this, and only before funding.
+    ///
+    /// This provides an exit from a mistaken `init` without burning the
+    /// deployed instance.
+    pub fn cancel(env: Env) -> Result<(), Error> {
+        let mut escrow = storage::load(&env)?;
+        auth::require(escrow.state == State::Created, Error::EscrowNotCancellable)?;
+        escrow.depositor.require_auth();
+
+        escrow.state = State::Refunded;
+        storage::save(&env, &escrow);
+
+        events::Cancelled {
+            depositor: escrow.depositor.clone(),
+        }
+        .publish(&env);
+        Ok(())
+    }
+
     /// Pulls the agreed amount from the depositor into the contract.
     ///
     /// Rejected once `deadline` has passed (inclusive, matching the boundary
@@ -119,14 +139,47 @@ impl EscrowContract {
     /// Returns the funds to the depositor.
     ///
     /// The depositor may do this only once the deadline has passed. The
-    /// arbiter may do it at any time.
+    /// arbiter may do it at any time. If a dispute is unresolved after the
+    /// dispute grace period expires (7 days past the original deadline), anyone
+    /// may refund to recover funds from an unresponsive arbiter.
+    ///
+    /// # Dispute recovery
+    ///
+    /// Once the deadline passes, an unresolved dispute becomes a safety
+    /// mechanism: if the arbiter is unresponsive, either party (or anyone) may
+    /// call `refund` after the grace period expires to recover the deposited
+    /// funds to the original depositor.
     pub fn refund(env: Env, caller: Address) -> Result<(), Error> {
         let mut escrow = storage::load(&env)?;
+        let now = env.ledger().timestamp();
+        const DISPUTE_GRACE_PERIOD_SECONDS: u64 = 7 * 24 * 60 * 60; // 7 days
+
+        // If disputed and past the grace period, allow recovery by anyone.
+        if escrow.state == State::Disputed {
+            let dispute_timeout = escrow.deadline.saturating_add(DISPUTE_GRACE_PERIOD_SECONDS);
+            if now >= dispute_timeout {
+                escrow.state = State::Refunded;
+                storage::save(&env, &escrow);
+                Self::pay(&env, &escrow, &escrow.depositor, escrow.amount);
+                events::Refunded {
+                    depositor: escrow.depositor.clone(),
+                    amount: escrow.amount,
+                    refunded_by: caller,
+                }
+                .publish(&env);
+                return Ok(());
+            }
+            // If disputed but within the grace period, require arbiter permission.
+            auth::require_auth_either_opt(&caller, &escrow.depositor, &escrow.arbiter)?;
+            return Err(Error::DeadlineNotReached);
+        }
+
+        // For Funded state, use the original refund logic.
         Self::require_funded(&escrow)?;
         auth::require_auth_either_opt(&caller, &escrow.depositor, &escrow.arbiter)?;
 
         let is_arbiter = escrow.arbiter.as_ref().is_some_and(|a| *a == caller);
-        if !is_arbiter && env.ledger().timestamp() < escrow.deadline {
+        if !is_arbiter && now < escrow.deadline {
             return Err(Error::DeadlineNotReached);
         }
 
@@ -170,16 +223,18 @@ impl EscrowContract {
     /// subtraction, so the two payments always sum to exactly the escrowed
     /// amount with no rounding leakage.
     ///
-    /// `arbiter` is checked again here even though `dispute` already refused
-    /// to reach `Disputed` without one (`arbiter` is set once at `init` and
-    /// never cleared, so this can't currently be reached any other way).
-    /// Defense-in-depth: if that invariant were ever weakened, this is what
-    /// turns a missing arbiter into [`Error::EscrowNoArbiter`] instead of
-    /// a call to `require_auth` on an address that was never meant to act.
+    /// # Invariants
+    ///
+    /// `resolve` is only callable from `State::Disputed`, which can only be
+    /// reached via `dispute`, which requires `escrow.arbiter.is_some()`.
+    /// Therefore an arbiter is guaranteed to exist here — no need to handle
+    /// the `None` case (#105).
     pub fn resolve(env: Env, split_bps: u32) -> Result<(), Error> {
         let mut escrow = storage::load(&env)?;
         auth::require(escrow.state == State::Disputed, Error::EscrowNotDisputed)?;
-        let arbiter = escrow.arbiter.clone().ok_or(Error::EscrowNoArbiter)?;
+        // SAFETY: `dispute` requires `arbiter.is_some()`, so reaching
+        // `State::Disputed` guarantees an arbiter exists (#105).
+        let arbiter = escrow.arbiter.clone().expect("dispute requires an arbiter");
         arbiter.require_auth();
 
         let (to_beneficiary, to_depositor) = math::split_bps(escrow.amount, split_bps)?;
@@ -205,12 +260,19 @@ impl EscrowContract {
 
     /// The current lifecycle position.
     pub fn state(env: Env) -> Result<State, Error> {
-        Ok(storage::load(&env)?.state)
+        Ok(storage::load_view(&env)?.state)
+    }
+
+    /// Extends the instance TTL for a long-lived escrow without changing it.
+    pub fn bump(env: Env) -> Result<(), Error> {
+        storage::load_view(&env)?;
+        sororail_common::storage::extend_instance(&env);
+        Ok(())
     }
 
     /// The full agreement.
     pub fn get(env: Env) -> Result<Escrow, Error> {
-        storage::load(&env)
+        storage::load_view(&env)
     }
 }
 
@@ -230,6 +292,7 @@ impl EscrowContract {
     /// Always called after the state transition has been persisted, so a
     /// reentrant token cannot observe a stale state.
     fn pay(env: &Env, escrow: &Escrow, to: &Address, amount: i128) {
+        debug_assert!(amount > 0, "pay requires a positive amount");
         token::TokenClient::new(env, &escrow.token).transfer(
             &env.current_contract_address(),
             to,

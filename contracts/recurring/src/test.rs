@@ -1,11 +1,33 @@
-use soroban_sdk::{
-    testutils::{Address as _, Ledger as _},
-    token::{StellarAssetClient, TokenClient},
-    Address, Env,
-};
-use sororail_common::Error;
+// Test fixtures do plain arithmetic on known-small constants; the checked-math
+// rule is for contract code.
+#![allow(clippy::arithmetic_side_effects)]
 
-use crate::contract::{RecurringContract, RecurringContractClient};
+use soroban_sdk::{
+    testutils::{storage::Instance as _, Address as _, Events as _, Ledger as _},
+    token::{StellarAssetClient, TokenClient},
+    Address, Env, Event,
+};
+use sororail_common::{storage::INSTANCE_BUMP, Error};
+
+use crate::{
+    contract::{RecurringContract, RecurringContractClient},
+    events::{Authorized, Cancelled, Charged},
+};
+
+#[test]
+fn bump_restores_the_instance_ttl_after_ledger_advance() {
+    let f = Fixture::new(None);
+    f.env
+        .ledger()
+        .set_sequence_number(f.env.ledger().sequence() + INSTANCE_BUMP - 1);
+    f.env.as_contract(&f.client.address, || {
+        assert!(f.env.storage().instance().get_ttl() < INSTANCE_BUMP);
+    });
+    f.client.bump();
+    f.env.as_contract(&f.client.address, || {
+        assert_eq!(f.env.storage().instance().get_ttl(), INSTANCE_BUMP);
+    });
+}
 
 const AMOUNT: i128 = 10_000;
 const PERIOD: u64 = 2_592_000; // 30 days
@@ -157,6 +179,51 @@ fn entry_points_error_before_authorize() {
 }
 
 #[test]
+fn authorize_rejects_multiple_invalid_args_in_order() {
+    let f = Fixture::new(None);
+
+    // InvalidAmount comes before InvalidDuration
+    let env = f.client.client.env.clone();
+    let contract_id = env.register(RecurringContract, ());
+    let client = RecurringContractClient::new(&env, &contract_id);
+    assert_eq!(
+        client.try_authorize(&f.payer, &f.payee, &f.token.address, &0, &0, &None),
+        Err(Ok(Error::InvalidAmount))
+    );
+
+    // InvalidDuration comes before InvalidBasisPoints
+    let contract_id2 = env.register(RecurringContract, ());
+    let client2 = RecurringContractClient::new(&env, &contract_id2);
+    assert_eq!(
+        client2.try_authorize(
+            &f.payer,
+            &f.payee,
+            &f.token.address,
+            &AMOUNT,
+            &0,
+            &Some(20_000)
+        ),
+        Err(Ok(Error::InvalidDuration))
+    );
+
+    // Validation completes before AlreadyInitialized check
+    // AlreadyInitialized comes before amount validation on second call
+    f.client.authorize(
+        &f.payer,
+        &f.payee,
+        &f.token.address,
+        &AMOUNT,
+        &PERIOD,
+        &None,
+    );
+    assert_eq!(
+        f.client
+            .try_authorize(&f.payer, &f.payee, &f.token.address, &0, &PERIOD, &None),
+        Err(Ok(Error::AlreadyInitialized))
+    );
+}
+
+#[test]
 #[should_panic]
 fn authorize_requires_the_payers_authorization() {
     let env = Env::default();
@@ -168,6 +235,35 @@ fn authorize_requires_the_payers_authorization() {
         &AMOUNT,
         &PERIOD,
         &None,
+    );
+}
+
+#[test]
+fn authorize_emits_the_authorized_event() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|l| l.timestamp = START);
+
+    let payer = Address::generate(&env);
+    let payee = Address::generate(&env);
+    let issuer = Address::generate(&env);
+    let token = env.register_stellar_asset_contract_v2(issuer).address();
+
+    let client = RecurringContractClient::new(&env, &env.register(RecurringContract, ()));
+    client.authorize(&payer, &payee, &token, &AMOUNT, &PERIOD, &Some(12));
+
+    let expected = Authorized {
+        payer: payer.clone(),
+        payee: payee.clone(),
+        token: token.clone(),
+        amount_per_period: AMOUNT,
+        period_seconds: PERIOD,
+        max_periods: Some(12),
+        first_chargeable_at: START + PERIOD,
+    };
+    assert_eq!(
+        env.events().all(),
+        std::vec![expected.to_xdr(&env, &client.address)],
     );
 }
 
@@ -198,6 +294,29 @@ fn charge_moves_funds_from_payer_to_payee() {
     assert_eq!(f.token.balance(&f.payer), MINT - AMOUNT);
     // The contract itself never holds anything.
     assert_eq!(f.token.balance(&f.client.address), 0);
+}
+
+/// Pins the wire shape indexers decode (SPEC.md `indexed_events`). The
+/// expected value is spelled out via `events::Charged`, so renaming a topic
+/// or a field fails here.
+#[test]
+fn charge_emits_the_charged_event() {
+    let f = Fixture::new(None);
+    f.at(START + PERIOD);
+    f.client.charge();
+
+    let expected = Charged {
+        payee: f.payee.clone(),
+        payer: f.payer.clone(),
+        amount: AMOUNT,
+        periods_charged: 1,
+        next_chargeable_at: START + PERIOD * 2,
+    };
+    // The contract emits `authorized` at setup and `charged` here -- take the last one.
+    let all = f.env.events().all().filter_by_contract(&f.client.address);
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
 }
 
 #[test]
@@ -288,12 +407,98 @@ fn charge_fails_once_the_payer_revokes_the_allowance() {
 }
 
 #[test]
+fn charge_fails_when_allowance_covers_fewer_periods_than_remain() {
+    // The allowance on the token is the real cap. When the allowance is exactly
+    // N periods' worth, charge N times, but charge N+1 fails while periods_charged
+    // stays at N (rollback from the failed transfer_from).
+    let f = Fixture::new(None);
+    let expiry = f.env.ledger().sequence() + 100_000;
+    let two_periods = AMOUNT * 2;
+    f.token
+        .approve(&f.payer, &f.client.address, &two_periods, &expiry);
+
+    // First charge: succeeds.
+    f.at(START + PERIOD);
+    assert_eq!(f.client.charge(), AMOUNT);
+    assert_eq!(f.client.get().periods_charged, 1);
+    assert_eq!(f.token.balance(&f.payee), AMOUNT);
+
+    // Second charge: succeeds, allowance exactly exhausted.
+    f.at(START + PERIOD * 2);
+    assert_eq!(f.client.charge(), AMOUNT);
+    assert_eq!(f.client.get().periods_charged, 2);
+    assert_eq!(f.token.balance(&f.payee), AMOUNT * 2);
+
+    // Third charge: fails because allowance is exhausted.
+    f.at(START + PERIOD * 3);
+    assert!(f.client.try_charge().is_err());
+    // periods_charged must remain 2 after the failed transfer_from.
+    assert_eq!(f.client.get().periods_charged, 2);
+}
+
+/// `charge` bumps `periods_charged` before `transfer_from`. A failed token
+/// call must roll that write back — `get()` still shows the pre-charge count.
+#[test]
+fn charge_reverts_cleanly_when_transfer_from_fails() {
+    let f = Fixture::new(None);
+    // Drain the payer so transfer_from fails even with a live allowance.
+    let payer_bal = f.token.balance(&f.payer);
+    f.token.transfer(&f.payer, &f.outsider, &payer_bal);
+
+    f.at(START + PERIOD);
+    assert!(f.client.try_charge().is_err());
+    assert_eq!(f.client.get().periods_charged, 0);
+    assert_eq!(f.token.balance(&f.payee), 0);
+}
+
+#[test]
 #[should_panic]
 fn charge_requires_the_payees_authorization() {
     let f = Fixture::new(None);
     f.at(START + PERIOD);
     f.env.set_auths(&[]);
     f.client.charge();
+}
+
+/// When the payer's token allowance to this contract is insufficient,
+/// `charge` must fail cleanly — reverting the `periods_charged` /
+/// `next_chargeable_at` state that was persisted just before the
+/// `transfer_from` call (#100).
+#[test]
+fn charge_reverts_schedule_state_when_allowance_is_insufficient() {
+    let f = Fixture::new(None);
+    let expiry = f.env.ledger().sequence() + 100_000;
+    // Set allowance to less than one period's worth.
+    f.token
+        .approve(&f.payer, &f.client.address, &(AMOUNT - 1), &expiry);
+
+    f.at(START + PERIOD);
+    assert!(f.client.try_charge().is_err());
+    // Schedule state must be unchanged — the failed transfer_from rolled
+    // back the optimistic write.
+    assert_eq!(f.client.get().periods_charged, 0);
+    assert_eq!(f.client.next_chargeable_at(), START + PERIOD);
+    assert_eq!(f.token.balance(&f.payee), 0);
+}
+
+/// When the payer's token allowance has expired (TTL reached 0), `charge`
+/// must fail and leave the schedule state untouched (#100).
+#[test]
+fn charge_reverts_schedule_state_when_allowance_is_expired() {
+    let f = Fixture::new(None);
+    // Grant an allowance that expires immediately.
+    let current_seq = f.env.ledger().sequence();
+    f.token
+        .approve(&f.payer, &f.client.address, &MINT, &(current_seq + 1));
+    // Advance the ledger past the allowance expiry.
+    f.env
+        .ledger()
+        .with_mut(|l| l.sequence = current_seq + 100_000);
+
+    f.at(START + PERIOD);
+    assert!(f.client.try_charge().is_err());
+    assert_eq!(f.client.get().periods_charged, 0);
+    assert_eq!(f.token.balance(&f.payee), 0);
 }
 
 // ------------------------------------------------------------------ cancel
@@ -307,6 +512,29 @@ fn the_payer_can_cancel() {
     f.at(START + PERIOD);
     assert_eq!(f.client.try_charge(), Err(Ok(Error::RecurringCancelled)));
     assert_eq!(f.token.balance(&f.payee), 0);
+}
+
+/// Pins the wire shape indexers decode (SPEC.md `indexed_events`). The
+/// expected value is spelled out via `events::Cancelled`, so renaming a
+/// topic or a field fails here.
+#[test]
+fn cancel_emits_the_cancelled_event() {
+    let f = Fixture::new(None);
+    f.at(START + PERIOD);
+    f.client.charge();
+    f.at(START + PERIOD + 500);
+    f.client.cancel(&f.payer);
+
+    let expected = Cancelled {
+        cancelled_by: f.payer.clone(),
+        periods_charged: 1,
+        cancelled_at: START + PERIOD + 500,
+    };
+    // The contract also emits `authorized` and `charged` earlier -- take the last event.
+    let all = f.env.events().all().filter_by_contract(&f.client.address);
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
 }
 
 #[test]

@@ -1,0 +1,20 @@
+# CODEOWNERS: every change needs maintainer review; security-critical
+# paths are listed explicitly so the requirement is visible and cannot
+# be weakened by accident. Replace @sororail/maintainers with the real
+# team once it exists.
+* @sororail/maintainers
+
+# ABI-stable shared error enum. Never renumber or remove a released variant.
+contracts/common/src/errors.rs @sororail/maintainers
+
+# Checked arithmetic all money math goes through. No silent saturation.
+contracts/common/src/math.rs @sororail/maintainers
+
+# Membership-before-auth guards and TTL helpers. Same criticality as above.
+contracts/common/src/auth.rs @sororail/maintainers
+contracts/common/src/storage.rs @sororail/maintainers
+
+# CI and toolchain pinning. A drift here silently changes every build.
+.github/workflows/ @sororail/maintainers
+rust-toolchain.toml @sororail/maintainers
+Cargo.lock @sororail/maintainers

@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-specs:
+    name: Generate and publish contract specs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          # Match rust-toolchain.toml (same pin as CI — issue #53).
+          toolchain: "1.97.1"
+          targets: wasm32v1-none
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: stellar/stellar-cli@8e402ea28202950b272fbabc34caad4d2f64fe87 # v27.1.0
+
+      - name: Build WASM contracts
+        run: cargo build --workspace --exclude sororail-integration-tests --target wasm32v1-none --release
+
+      - name: Generate contract specs
+        run: make specs
+
+      - name: Create Release with Specs
+        uses: softprops/action-gh-release@d99959edae48b5ffffd7b36b52d91f8b9b999d8b # v1
+        with:
+          files: dist/specs/*.json
+          draft: false
+          prerelease: false
+          generate_release_notes: true

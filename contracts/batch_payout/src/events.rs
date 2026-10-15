@@ -4,9 +4,11 @@
 
 use soroban_sdk::{contractevent, Address};
 
-/// A batch completed. Emitted once per batch, not once per recipient --
-/// per-recipient detail is available from the token's own transfer events,
-/// and duplicating it here would bloat the ledger for large payrolls.
+/// A batch completed. Emitted once per batch, not once per recipient.
+///
+/// Indexers must correlate the token contract's `transfer` events in the same
+/// transaction to recover each recipient and amount. This event intentionally
+/// does not duplicate those transfers, keeping large payrolls compact.
 #[contractevent(topics = ["batch_payout", "executed"])]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Executed {

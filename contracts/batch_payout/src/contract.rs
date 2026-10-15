@@ -27,9 +27,13 @@ impl BatchPayoutContract {
         recipients: Vec<Payment>,
     ) -> Result<Receipt, Error> {
         let count = Self::check_size(&recipients)?;
+        let contract_address = env.current_contract_address();
 
         let mut total: i128 = 0;
         for payment in recipients.iter() {
+            if payment.to == contract_address {
+                return Err(Error::IdenticalParties);
+            }
             math::require_positive(payment.amount)?;
             total = math::add(total, payment.amount)?;
         }
@@ -66,7 +70,15 @@ impl BatchPayoutContract {
         math::require_positive(amount_each)?;
 
         let count = Self::check_size_of(recipients.len())?;
-        let total = math::mul(amount_each, count as i128)?;
+        let contract_address = env.current_contract_address();
+
+        for to in recipients.iter() {
+            if to == contract_address {
+                return Err(Error::IdenticalParties);
+            }
+        }
+
+        let total = math::mul(amount_each, i128::from(count))?;
 
         funder.require_auth();
 
@@ -99,10 +111,14 @@ impl BatchPayoutContract {
     /// Runs exactly the validation [`Self::execute`] does, so a preview that
     /// succeeds means the batch itself will not be rejected for size, an
     /// invalid amount, or an overflowing total.
-    pub fn preview(_env: Env, recipients: Vec<Payment>) -> Result<Receipt, Error> {
+    pub fn preview(env: Env, recipients: Vec<Payment>) -> Result<Receipt, Error> {
         let count = Self::check_size(&recipients)?;
+        let contract_address = env.current_contract_address();
         let mut total: i128 = 0;
         for payment in recipients.iter() {
+            if payment.to == contract_address {
+                return Err(Error::IdenticalParties);
+            }
             math::require_positive(payment.amount)?;
             total = math::add(total, payment.amount)?;
         }

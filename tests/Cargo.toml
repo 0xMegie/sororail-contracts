@@ -14,9 +14,12 @@ doctest = false
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-sororail-common = { workspace = true }
+sororail-common = { workspace = true, features = ["testutils"] }
 sororail-escrow = { path = "../contracts/escrow" }
 sororail-stream = { path = "../contracts/stream" }
 sororail-vesting = { path = "../contracts/vesting" }
 sororail-recurring = { path = "../contracts/recurring" }
 sororail-batch-payout = { path = "../contracts/batch_payout" }
+
+[lints]
+workspace = true

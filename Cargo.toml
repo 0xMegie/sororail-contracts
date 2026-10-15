@@ -6,7 +6,7 @@ members = ["contracts/*", "tests"]
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/sororail/contracts"
+repository = "https://github.com/Sororail/sororail-contracts"
 homepage = "https://github.com/sororail"
 rust-version = "1.91"
 
@@ -15,6 +15,29 @@ rust-version = "1.91"
 # prerelease -- do not pin it.
 soroban-sdk = "27.0.6"
 sororail-common = { path = "contracts/common", version = "0.1.0" }
+
+# Lint policy lives here, not in CI flags, so a plain `cargo clippy` locally
+# gives the same verdict as CI. Every member opts in with `[lints] workspace = true`.
+[workspace.lints.rust]
+warnings = "deny"
+unused = { level = "deny", priority = -1 }
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+# Money math must go through the checked helpers in sororail_common::math.
+# Test files opt out with a file-level #![allow].
+arithmetic_side_effects = "deny"
+# Casts on amounts/timestamps must be explicit and provably lossless (#49):
+# narrowing, sign-dropping or wrapping `as` casts are denied outright, and
+# lossless widening must be spelled `i128::from(x)` so any remaining `as`
+# on money stands out in review. Full `clippy::pedantic` is deliberately not
+# enabled: on this codebase it is dominated by doc-style lints (`# Errors`
+# sections, backticks) that add noise without catching money bugs.
+cast_possible_truncation = "deny"
+cast_sign_loss = "deny"
+cast_possible_wrap = "deny"
+cast_lossless = "deny"
 
 # Money math must trap on overflow rather than wrap or saturate, in release
 # builds as well as debug. See contracts/common/src/math.rs.

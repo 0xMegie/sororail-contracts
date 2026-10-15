@@ -1,14 +1,35 @@
+// Test fixtures do plain arithmetic on known-small constants; the checked-math
+// rule is for contract code.
+#![allow(clippy::arithmetic_side_effects)]
+
 use soroban_sdk::{
-    testutils::{Address as _, Ledger as _},
-    token::{StellarAssetClient, TokenClient},
-    Address, Env,
+    map,
+    testutils::{storage::Instance as _, Address as _, Events as _, Ledger as _},
+    token::TokenClient,
+    vec, Address, Env, Event, IntoVal, Symbol, Val,
 };
-use sororail_common::Error;
+use sororail_common::{storage::INSTANCE_BUMP, testutils::TestEnv, Error};
 
 use crate::{
     contract::{VestingContract, VestingContractClient},
+    events::{Claimed, Revoked},
     types::Grant,
 };
+
+#[test]
+fn bump_restores_the_instance_ttl_after_ledger_advance() {
+    let f = Fixture::new(true);
+    f.env
+        .ledger()
+        .set_sequence_number(f.env.ledger().sequence() + INSTANCE_BUMP - 1);
+    f.env.as_contract(&f.client.address, || {
+        assert!(f.env.storage().instance().get_ttl() < INSTANCE_BUMP);
+    });
+    f.client.bump();
+    f.env.as_contract(&f.client.address, || {
+        assert_eq!(f.env.storage().instance().get_ttl(), INSTANCE_BUMP);
+    });
+}
 
 const TOTAL: i128 = 1_000_000;
 const START: u64 = 1_000_000;
@@ -34,15 +55,11 @@ impl Fixture<'_> {
     }
 
     fn with_schedule_at(start: u64, cliff: u64, duration: u64, revocable: bool) -> Self {
-        let env = Env::default();
-        env.mock_all_auths();
-        env.ledger().with_mut(|l| l.timestamp = START);
-
-        let grantor = Address::generate(&env);
-        let beneficiary = Address::generate(&env);
-        let issuer = Address::generate(&env);
-        let token_address = env.register_stellar_asset_contract_v2(issuer).address();
-        StellarAssetClient::new(&env, &token_address).mint(&grantor, &MINT);
+        let te = TestEnv::at(start);
+        let (token, grantor) = te.make_token(MINT);
+        let token_address = token.address.clone();
+        let beneficiary = te.make_address();
+        let env = te.env;
 
         let client = VestingContractClient::new(&env, &env.register(VestingContract, ()));
         client.create(
@@ -212,6 +229,90 @@ fn vested_amount_never_underflows_with_a_start_near_u64_max() {
     assert_eq!(g.vested_amount(u64::MAX), Ok(TOTAL));
 }
 
+/// Guards the division by `duration` in the linear branch of
+/// `vested_amount`: every `(start, cliff, duration)` combination here
+/// satisfies `create`'s validation (`duration > 0`, `cliff <= duration`), and
+/// no probe timestamp may surface `DivisionByZero`.
+#[test]
+fn linear_branch_never_divides_by_zero_duration() {
+    let env = Env::default();
+    let starts = [0u64, 1, START, u64::MAX - 1_000, u64::MAX];
+    let schedules = [
+        (0u64, 1u64),
+        (1, 1),
+        (0, DURATION),
+        (CLIFF, DURATION),
+        (DURATION, DURATION),
+        (0, u64::MAX),
+    ];
+
+    for start in starts {
+        for (cliff, duration) in schedules {
+            // Mirror `create`'s validation: only valid schedules are stored.
+            assert!(duration > 0);
+            assert!(cliff <= duration);
+            let g = Grant {
+                grantor: Address::generate(&env),
+                beneficiary: Address::generate(&env),
+                token: Address::generate(&env),
+                total: TOTAL,
+                start,
+                cliff,
+                duration,
+                revocable: true,
+                claimed: 0,
+                returned: 0,
+                revoked_at: None,
+            };
+            let cliff_at = g.cliff_at();
+            let end = g.end_at();
+            let probes = [
+                0,
+                start.saturating_sub(1),
+                start,
+                cliff_at.saturating_sub(1),
+                cliff_at,
+                end.saturating_sub(1),
+                end,
+                end.saturating_add(1),
+                u64::MAX,
+            ];
+            for at in probes {
+                let result = g.vested_amount(at);
+                assert_ne!(
+                    result,
+                    Err(Error::DivisionByZero),
+                    "div-by-zero at start={start} cliff={cliff} duration={duration} at={at}"
+                );
+                // When the linear branch is taken, the divisor is non-zero.
+                let in_linear = at >= cliff_at && at < end;
+                if in_linear {
+                    assert!(
+                        g.duration > 0,
+                        "linear branch hit with zero duration at start={start}"
+                    );
+                    assert!(result.is_ok());
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn long_duration_large_total_stays_inside_documented_safe_range() {
+    let env = Env::default();
+    let ten_years = 10 * 365 * 24 * 60 * 60;
+    let mut g = bare(&env, 0, ten_years);
+
+    // One billion 18-decimal tokens over ten years stays well below i128::MAX
+    // during the checked `total * elapsed / duration` calculation.
+    g.total = 1_000_000_000_i128 * 1_000_000_000_000_000_000_i128;
+
+    assert_eq!(g.vested_amount(START + ten_years / 2), Ok(g.total / 2));
+    assert!(g.vested_amount(START + ten_years - 1).is_ok());
+    assert_eq!(g.vested_amount(START + ten_years), Ok(g.total));
+}
+
 // ------------------------------------------------------------------ create
 
 #[test]
@@ -282,6 +383,34 @@ fn create_rejects_a_cliff_after_the_end() {
     );
 }
 
+/// When several create inputs are invalid at once, the first check in
+/// `create`'s validation sequence wins. Locks the order:
+/// `require_positive(total)` → `duration == 0` → `cliff > duration`.
+#[test]
+fn create_reports_the_first_validation_error_when_several_apply() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let c = VestingContractClient::new(&env, &env.register(VestingContract, ()));
+    let (a, b, t) = (
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+    );
+
+    // total=-1, duration=0, cliff=5: InvalidAmount beats InvalidDuration /
+    // VestingCliffAfterEnd.
+    assert_eq!(
+        c.try_create(&a, &b, &t, &-1, &START, &5, &0, &true),
+        Err(Ok(Error::InvalidAmount))
+    );
+
+    // total ok, duration=0, cliff=5: InvalidDuration beats VestingCliffAfterEnd.
+    assert_eq!(
+        c.try_create(&a, &b, &t, &TOTAL, &START, &5, &0, &true),
+        Err(Ok(Error::InvalidDuration))
+    );
+}
+
 #[test]
 fn create_rejects_a_schedule_whose_end_would_overflow_u64() {
     // `start + duration` must be representable, or `end_at`'s
@@ -326,6 +455,201 @@ fn create_rejects_a_second_call() {
 }
 
 #[test]
+fn create_rejects_identical_grantor_and_beneficiary() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let c = VestingContractClient::new(&env, &env.register(VestingContract, ()));
+    let party = Address::generate(&env);
+    let token = Address::generate(&env);
+    assert_eq!(
+        c.try_create(&party, &party, &token, &TOTAL, &START, &CLIFF, &DURATION, &true),
+        Err(Ok(Error::IdenticalParties))
+    );
+}
+
+/// `create` persists the grant before the token pull. A failed transfer must
+/// roll back that write so `get` still returns `NotInitialized`.
+#[test]
+fn create_with_contract_as_beneficiary_succeeds() {
+    let te = TestEnv::at(START);
+    let (token_client, grantor) = te.make_token(MINT);
+    let token = token_client.address.clone();
+    let env = te.env;
+    let contract_id = env.register(VestingContract, ());
+    let client = VestingContractClient::new(&env, &contract_id);
+
+    let result = client.try_create(
+        &grantor,
+        &contract_id,
+        &token,
+        &TOTAL,
+        &START,
+        &CLIFF,
+        &DURATION,
+        &true,
+    );
+    assert!(
+        result.is_ok(),
+        "create with contract as beneficiary should succeed"
+    );
+}
+
+#[test]
+fn create_rejects_multiple_invalid_args_in_order() {
+    let te = TestEnv::at(START);
+    let (token_client, grantor) = te.make_token(MINT);
+    let token = token_client.address.clone();
+    let beneficiary = te.make_address();
+    let env = te.env;
+
+    let contract_id = env.register(VestingContract, ());
+    let client = VestingContractClient::new(&env, &contract_id);
+
+    // AlreadyInitialized comes before InvalidAmount
+    client.create(
+        &grantor,
+        &beneficiary,
+        &token,
+        &TOTAL,
+        &START,
+        &CLIFF,
+        &DURATION,
+        &true,
+    );
+    assert_eq!(
+        client.try_create(
+            &grantor,
+            &beneficiary,
+            &token,
+            &0,
+            &START,
+            &CLIFF,
+            &DURATION,
+            &true
+        ),
+        Err(Ok(Error::AlreadyInitialized))
+    );
+
+    // InvalidAmount comes before InvalidDuration
+    let contract_id2 = env.register(VestingContract, ());
+    let client2 = VestingContractClient::new(&env, &contract_id2);
+    assert_eq!(
+        client2.try_create(
+            &grantor,
+            &beneficiary,
+            &token,
+            &0,
+            &START,
+            &CLIFF,
+            &0,
+            &true
+        ),
+        Err(Ok(Error::InvalidAmount))
+    );
+
+    // InvalidDuration comes before VestingCliffAfterEnd
+    let contract_id3 = env.register(VestingContract, ());
+    let client3 = VestingContractClient::new(&env, &contract_id3);
+    assert_eq!(
+        client3.try_create(
+            &grantor,
+            &beneficiary,
+            &token,
+            &TOTAL,
+            &START,
+            &CLIFF,
+            &0,
+            &true
+        ),
+        Err(Ok(Error::InvalidDuration))
+    );
+}
+
+#[test]
+fn create_reverts_cleanly_when_grantor_cannot_fund() {
+    let te = TestEnv::at(START);
+    let (token_client, grantor) = te.make_token(1);
+    let token = token_client.address.clone();
+    let beneficiary = te.make_address();
+    let env = te.env.clone();
+    let c = VestingContractClient::new(&env, &env.register(VestingContract, ()));
+
+    assert!(c
+        .try_create(
+            &grantor,
+            &beneficiary,
+            &token,
+            &TOTAL,
+            &START,
+            &CLIFF,
+            &DURATION,
+            &true
+        )
+        .is_err());
+    assert_eq!(c.try_get(), Err(Ok(Error::NotInitialized)));
+    assert_eq!(token_client.balance(&c.address), 0);
+    assert_eq!(token_client.balance(&grantor), 1);
+}
+
+/// Pins the wire shape indexers decode (SPEC.md `indexed_events`). The
+/// expected value is spelled out literally rather than built from
+/// `events::Created`, so renaming a topic or a field fails here.
+#[test]
+fn create_emits_the_created_event() {
+    let te = TestEnv::at(START);
+    let (token_client, grantor) = te.make_token(MINT);
+    let token_address = token_client.address.clone();
+    let beneficiary = te.make_address();
+    let env = te.env.clone();
+
+    let client = VestingContractClient::new(&env, &env.register(VestingContract, ()));
+    client.create(
+        &grantor,
+        &beneficiary,
+        &token_address,
+        &TOTAL,
+        &START,
+        &CLIFF,
+        &DURATION,
+        &true,
+    );
+
+    let total: Val = TOTAL.into_val(&env);
+    let start: Val = START.into_val(&env);
+    let cliff: Val = CLIFF.into_val(&env);
+    let duration: Val = DURATION.into_val(&env);
+    let revocable: Val = true.into_val(&env);
+    // Map data: keys are the field names, serialized in sorted order.
+    let data: Val = map![
+        &env,
+        (Symbol::new(&env, "beneficiary"), beneficiary.into_val(&env)),
+        (Symbol::new(&env, "cliff"), cliff),
+        (Symbol::new(&env, "duration"), duration),
+        (Symbol::new(&env, "revocable"), revocable),
+        (Symbol::new(&env, "start"), start),
+        (Symbol::new(&env, "token"), token_address.into_val(&env)),
+        (Symbol::new(&env, "total"), total),
+    ]
+    .into_val(&env);
+    assert_eq!(
+        env.events().all().filter_by_contract(&client.address),
+        vec![
+            &env,
+            (
+                client.address.clone(),
+                vec![
+                    &env,
+                    Symbol::new(&env, "vesting").into_val(&env),
+                    Symbol::new(&env, "created").into_val(&env),
+                    grantor.into_val(&env),
+                ],
+                data,
+            ),
+        ]
+    );
+}
+
+#[test]
 fn entry_points_error_before_create() {
     let env = Env::default();
     env.mock_all_auths();
@@ -365,12 +689,55 @@ fn claim_is_blocked_before_the_cliff() {
 }
 
 #[test]
+fn claim_exactly_at_and_one_second_before_cliff() {
+    let env = Env::default();
+    let g = bare(&env, CLIFF, DURATION);
+    // One second before cliff_at(): nothing vested yet.
+    assert_eq!(g.claimable_at(START + CLIFF - 1), Ok(0));
+    // Exactly at cliff_at(): cliff vests its proportion in one step.
+    assert_eq!(g.claimable_at(START + CLIFF), Ok(TOTAL / 10));
+}
+
+#[test]
+fn claim_fails_one_second_before_cliff_but_succeeds_at_cliff() {
+    let f = Fixture::new(true);
+    f.at(START + CLIFF - 1);
+    assert_eq!(f.client.try_claim(), Err(Ok(Error::VestingCliffNotReached)));
+    f.at(START + CLIFF);
+    assert_eq!(f.client.claim(), TOTAL / 10);
+    assert_eq!(f.token.balance(&f.beneficiary), TOTAL / 10);
+    f.assert_conserved();
+}
+
+#[test]
 fn claim_pays_the_vested_portion() {
     let f = Fixture::new(true);
     f.at(START + 500);
     assert_eq!(f.client.claim(), TOTAL / 2);
     assert_eq!(f.token.balance(&f.beneficiary), TOTAL / 2);
     f.assert_conserved();
+}
+
+/// Pins the wire shape indexers decode (SPEC.md `indexed_events`). The
+/// expected value is spelled out via `events::Claimed`, so renaming a topic
+/// or a field fails here.
+#[test]
+fn claim_emits_the_claimed_event() {
+    let f = Fixture::new(true);
+    f.at(START + 500);
+    f.client.claim();
+
+    let expected = Claimed {
+        beneficiary: f.beneficiary.clone(),
+        amount: TOTAL / 2,
+        total_claimed: TOTAL / 2,
+    };
+    // filter_by_contract returns ContractEvents; .events() gives &[ContractEvent].
+    // The contract emits `created` at setup and `claimed` here -- take the last one.
+    let all = f.env.events().all().filter_by_contract(&f.client.address);
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
 }
 
 #[test]
@@ -469,6 +836,20 @@ fn revoke_before_the_cliff_returns_everything() {
 }
 
 #[test]
+fn revoke_before_the_cliff_then_advance_time_and_claim() {
+    let f = Fixture::new(true);
+    // Revoke before the cliff.
+    f.client.revoke();
+    // Advance time past the cliff -- but revoked_at freezes effective time.
+    f.at(START + CLIFF + 1_000);
+    // After revocation before the cliff, claim still reports CliffNotReached
+    // because effective time is frozen at revoked_at (before the cliff).
+    // Nothing was ever vested, so nothing is claimable.
+    assert_eq!(f.client.try_claim(), Err(Ok(Error::VestingCliffNotReached)));
+    f.assert_conserved();
+}
+
+#[test]
 fn revoke_after_the_end_returns_nothing() {
     let f = Fixture::new(true);
     f.at(START + DURATION + 500);
@@ -500,6 +881,29 @@ fn revoke_requires_the_grantors_authorization() {
     f.at(START + 300);
     f.env.set_auths(&[]);
     f.client.revoke();
+}
+
+#[test]
+fn revoke_emits_the_revoked_event() {
+    let f = Fixture::new(true);
+    f.at(START + 300);
+    f.client.revoke();
+
+    // At t = START + 300 with DURATION = 1_000 and TOTAL = 1_000_000:
+    // vested = TOTAL * 300 / 1000 = 300_000 (still claimable)
+    // returned = TOTAL * 700 / 1000 = 700_000
+    let expected = Revoked {
+        grantor: f.grantor.clone(),
+        returned_to_grantor: TOTAL * 7 / 10,
+        still_claimable: TOTAL * 3 / 10,
+        revoked_at: START + 300,
+    };
+    // filter_by_contract returns ContractEvents; .events() gives &[ContractEvent].
+    // The contract emits `created` at setup and `revoked` here — take the last one.
+    let all = f.env.events().all().filter_by_contract(&f.client.address);
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
 }
 
 // ------------------------------------------------------- conservation
@@ -548,4 +952,66 @@ fn a_schedule_that_divides_badly_still_conserves() {
     f.assert_conserved();
     assert_eq!(f.token.balance(&f.beneficiary), TOTAL);
     assert_eq!(f.held(), 0);
+}
+
+#[test]
+fn vesting_with_long_duration_and_large_total_probes_overflow_boundary() {
+    // `mul_div` computes `total * elapsed` before dividing by `duration`, so
+    // the overflow ceiling is on that product, not on `total` alone: at the
+    // midpoint of a 10-year (≈315,576,000s) schedule, `elapsed` is
+    // ≈157,788,000, and overflow needs `total > i128::MAX / elapsed`
+    // (≈1.08e30) -- many orders of magnitude above a realistic token supply.
+    const TEN_YEARS_SECONDS: u64 = 315_576_000;
+    const SAFE_TOTAL: i128 = 29_000_000;
+    const OVERFLOW_TOTAL: i128 = i128::MAX / 2;
+
+    let env = Env::default();
+
+    // Test that a safe total with long duration vests successfully.
+    let g_safe = Grant {
+        grantor: Address::generate(&env),
+        beneficiary: Address::generate(&env),
+        token: Address::generate(&env),
+        total: SAFE_TOTAL,
+        start: START,
+        cliff: 0,
+        duration: TEN_YEARS_SECONDS,
+        revocable: true,
+        claimed: 0,
+        returned: 0,
+        revoked_at: None,
+    };
+    // At the midpoint (half elapsed), vesting should succeed.
+    let half_elapsed = TEN_YEARS_SECONDS / 2;
+    let vested_halfway = g_safe.vested_amount(START + half_elapsed);
+    assert!(
+        vested_halfway.is_ok(),
+        "safe total should not overflow at midpoint"
+    );
+    // At full duration, should have vested the full amount.
+    assert_eq!(
+        g_safe.vested_amount(START + TEN_YEARS_SECONDS),
+        Ok(SAFE_TOTAL)
+    );
+
+    // Test that an unsafe total with long duration overflows.
+    let g_unsafe = Grant {
+        grantor: Address::generate(&env),
+        beneficiary: Address::generate(&env),
+        token: Address::generate(&env),
+        total: OVERFLOW_TOTAL,
+        start: START,
+        cliff: 0,
+        duration: TEN_YEARS_SECONDS,
+        revocable: true,
+        claimed: 0,
+        returned: 0,
+        revoked_at: None,
+    };
+    // At the midpoint (half elapsed), the multiplication should overflow.
+    assert_eq!(
+        g_unsafe.vested_amount(START + half_elapsed),
+        Err(Error::Overflow),
+        "unsafe total should overflow at midpoint of long duration"
+    );
 }

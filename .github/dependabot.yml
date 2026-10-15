@@ -1,0 +1,40 @@
+# Dependabot keeps Cargo and Actions deps monitored (issue #54).
+# SPEC.md forbids pinning soroban-sdk prereleases; ignore pre-release
+# version ranges so we only get nudged when a stable release lands.
+
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - chore
+    commit-message:
+      prefix: chore
+      include: scope
+    # Ignore every pre-release of soroban-sdk for the next major lines so a
+    # floating *-rc* on crates.io cannot open a PR. Stable 28.0.0 / 29.0.0
+    # still open normally once they exist without a pre-release identifier.
+    ignore:
+      - dependency-name: "soroban-sdk"
+        versions:
+          - ">=28.0.0-0, <28.0.0"
+          - ">=29.0.0-0, <29.0.0"
+          - ">=30.0.0-0, <30.0.0"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - chore
+    commit-message:
+      prefix: chore
+      include: scope

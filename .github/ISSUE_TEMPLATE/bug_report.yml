@@ -1,0 +1,46 @@
+name: Bug report
+description: Something in the contracts or tooling behaves incorrectly.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Contracts move money. Include a reproduction that fails on `main` with `make ci` or `cargo nextest`.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong in one or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Exact commands, contract, and inputs. Prefer a failing test sketch.
+      placeholder: |
+        1. cargo nextest run -E 'test(=…)'
+        2. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    id: toolchain
+    attributes:
+      label: Toolchain
+      description: Output of `rustc -V` (should match rust-toolchain.toml).
+      placeholder: rustc 1.97.1
+    validations:
+      required: false

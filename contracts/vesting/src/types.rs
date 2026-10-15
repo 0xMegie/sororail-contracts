@@ -53,6 +53,18 @@ impl Grant {
     /// Pure: no storage, no environment, so it is testable in isolation.
     /// Revocation freezes the schedule, so vesting is evaluated at the earlier
     /// of `at` and the revocation timestamp.
+    ///
+    /// # Overflow ceiling
+    ///
+    /// This function computes `total * elapsed / duration` using [`math::mul_div`],
+    /// which errors on overflow rather than wrapping. For a given duration, the
+    /// maximum safe `total` is approximately `i128::MAX / duration_in_seconds`.
+    ///
+    /// For example, with a 10-year vesting duration (~315,576,000 seconds), the
+    /// maximum total before `Overflow` is roughly 29 million tokens. Integrators
+    /// should size their token's decimals and supply to stay within this limit:
+    /// a token with 18 decimal places has a per-vesting-grant ceiling of about
+    /// 29 femto-tokens per second of duration, or ~1 million base units for 10 years.
     pub fn vested_amount(&self, at: u64) -> Result<i128, Error> {
         let effective = match self.revoked_at {
             Some(revoked) => at.min(revoked),
@@ -65,24 +77,30 @@ impl Grant {
             return Ok(0);
         }
         // Everything at the end.
-        let end = self.start.saturating_add(self.duration);
+        let end = self.end_at();
         if effective >= end {
             return Ok(self.total);
         }
 
         // Linear in between. `duration` is non-zero because `end > effective
-        // >= cliff_at >= start` implies `end > start`.
-        //
+        // >= cliff_at >= start` implies `end > start`. `create` rejects
+        // `duration == 0`, so this holds for every stored grant.
+        debug_assert!(
+            self.duration > 0,
+            "linear vesting branch requires non-zero duration"
+        );
         // `effective - self.start` cannot underflow: `effective >= cliff_at
         // >= start` always holds (the branches above return before this
-        // point whenever `effective < cliff_at`). The `saturating_add` calls
-        // above are what make `cliff_at`/`end` well-defined rather than
-        // panicking on an unvalidated `Grant`, but `VestingContract::create`
-        // additionally rejects any `start + duration` that would need that
-        // saturation, so for a grant created through the contract, `end` is
-        // always the true, non-saturated sum.
-        let elapsed = (effective - self.start) as i128;
-        math::mul_div(self.total, elapsed, self.duration as i128)
+        // point whenever `effective < cliff_at`), so `math::sub` here is
+        // defense-in-depth rather than a path that can actually return
+        // `Underflow`. The `saturating_add` calls above are what make
+        // `cliff_at`/`end` well-defined rather than panicking on an
+        // unvalidated `Grant`, but `VestingContract::create` additionally
+        // rejects any `start + duration` that would need that saturation, so
+        // for a grant created through the contract, `end` is always the
+        // true, non-saturated sum.
+        let elapsed = math::sub(i128::from(effective), i128::from(self.start))?;
+        math::mul_div(self.total, elapsed, i128::from(self.duration))
     }
 
     /// Vested but not yet claimed, as of `at`.
@@ -96,6 +114,10 @@ impl Grant {
     }
 
     /// Whether the grant has been revoked.
+    ///
+    /// The lifecycle is binary and one-way, so it is modelled by the
+    /// `revoked_at` timestamp (which vesting math needs anyway) rather than a
+    /// `State` enum like escrow's. See "Lifecycle modeling" in SPEC.md.
     pub fn is_revoked(&self) -> bool {
         self.revoked_at.is_some()
     }

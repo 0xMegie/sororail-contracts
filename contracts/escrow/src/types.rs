@@ -13,6 +13,12 @@ use soroban_sdk::{contracttype, Address};
 /// `Released`, `Refunded` and `Resolved` are terminal. Every other transition
 /// is illegal and returns an error rather than panicking.
 ///
+/// Escrow is the only contract with an explicit state enum because it is the
+/// only one whose lifecycle branches: `Funded` has three exits and `Disputed`
+/// is a second non-terminal state. The binary lifecycles in `stream`,
+/// `vesting` and `recurring` use an optional timestamp or flag instead. See
+/// "Lifecycle modeling" in SPEC.md for when to choose which.
+///
 /// Discriminants are part of the ABI; do not renumber them.
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

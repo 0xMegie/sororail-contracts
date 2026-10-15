@@ -16,6 +16,18 @@ impl StreamContract {
     ///
     /// `start` may be in the past, which backdates accrual -- the sender is
     /// choosing to make funds immediately withdrawable.
+    ///
+    /// `sender` and `recipient` must differ; a self-stream is rejected.
+    ///
+    /// # Why positional arguments (not a `CreateStreamParams` struct)
+    ///
+    /// Soroban does support a single `#[contracttype]` struct parameter, and
+    /// that would silence this lint. Positional arguments were kept anyway so
+    /// the on-chain ABI stays a flat argument list — the same shape the
+    /// TypeScript SDK's uniform build → simulate → sign → send → confirm
+    /// surface (SPEC.md) will bind without introducing a nested params object
+    /// per entry point. Revisit only if the SDK deliberately adopts struct
+    /// params across every contract.
     #[allow(clippy::too_many_arguments)]
     pub fn create(
         env: Env,
@@ -30,11 +42,17 @@ impl StreamContract {
         if storage::is_initialized(&env) {
             return Err(Error::AlreadyInitialized);
         }
+        if sender == recipient {
+            return Err(Error::IdenticalParties);
+        }
         math::require_positive(rate_per_second)?;
         if stop <= start {
             return Err(Error::InvalidTimeRange);
         }
-        let deposited = math::mul(rate_per_second, (stop - start) as i128)?;
+        let deposited = math::mul(
+            rate_per_second,
+            math::sub(i128::from(stop), i128::from(start))?,
+        )?;
 
         sender.require_auth();
 
@@ -147,11 +165,12 @@ impl StreamContract {
         }
         stream.sender.require_auth();
         math::require_positive(amount)?;
-        if amount % stream.rate_per_second != 0 {
+        if amount.checked_rem(stream.rate_per_second) != Some(0) {
             return Err(Error::InvalidAmount);
         }
 
-        let seconds = math::div(amount, stream.rate_per_second)? as u64;
+        let seconds = u64::try_from(math::div(amount, stream.rate_per_second)?)
+            .map_err(|_| Error::InvalidTimeRange)?;
         stream.stop = stream
             .stop
             .checked_add(seconds)
@@ -181,7 +200,10 @@ impl StreamContract {
             return Err(Error::StreamNotExtendable);
         }
 
-        let added = math::mul(stream.rate_per_second, (new_stop - stream.stop) as i128)?;
+        let added = math::mul(
+            stream.rate_per_second,
+            math::sub(i128::from(new_stop), i128::from(stream.stop))?,
+        )?;
         stream.stop = new_stop;
         stream.deposited = math::add(stream.deposited, added)?;
         storage::save(&env, &stream);
@@ -200,7 +222,7 @@ impl StreamContract {
     /// Accrued but unwithdrawn for the recipient; refundable remainder for the
     /// sender; zero for anyone else.
     pub fn balance_of(env: Env, who: Address) -> Result<i128, Error> {
-        let stream = storage::load(&env)?;
+        let stream = storage::load_view(&env)?;
         let now = env.ledger().timestamp();
 
         if who == stream.recipient {
@@ -215,12 +237,19 @@ impl StreamContract {
 
     /// What the contract still holds for this stream.
     pub fn remaining(env: Env) -> Result<i128, Error> {
-        storage::load(&env)?.remaining()
+        storage::load_view(&env)?.remaining()
+    }
+
+    /// Extends the instance TTL for a long-lived stream without changing it.
+    pub fn bump(env: Env) -> Result<(), Error> {
+        storage::load_view(&env)?;
+        sororail_common::storage::extend_instance(&env);
+        Ok(())
     }
 
     /// The full stream record.
     pub fn get(env: Env) -> Result<Stream, Error> {
-        storage::load(&env)
+        storage::load_view(&env)
     }
 }
 
@@ -228,6 +257,7 @@ impl StreamContract {
 impl StreamContract {
     /// Pulls `amount` of the streamed token from the sender into this contract.
     fn pull(env: &Env, stream: &Stream, amount: i128) {
+        debug_assert!(amount > 0, "pull requires a positive amount");
         token::TokenClient::new(env, &stream.token).transfer(
             &stream.sender,
             env.current_contract_address(),
@@ -239,6 +269,7 @@ impl StreamContract {
     ///
     /// Always called after the state change has been persisted.
     fn pay(env: &Env, stream: &Stream, to: &Address, amount: i128) {
+        debug_assert!(amount > 0, "pay requires a positive amount");
         token::TokenClient::new(env, &stream.token).transfer(
             &env.current_contract_address(),
             to,

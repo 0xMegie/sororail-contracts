@@ -23,5 +23,10 @@ pub mod storage;
 
 pub use errors::Error;
 
+// Available when the crate is used as a test dependency (feature = "testutils")
+// or inside the crate's own test suite.
+#[cfg(any(test, feature = "testutils"))]
+pub mod testutils;
+
 #[cfg(test)]
 mod test;

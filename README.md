@@ -93,9 +93,30 @@ are the most common Soroban vulnerability class, so guards live in
 `sororail_common::auth` and every privileged entry point has a test asserting it
 fails for an unauthorized caller.
 
-**State expires.** Soroban archives entries that are not extended. Every entry
-point that touches storage extends the TTL of what it touched, using the helpers
-in `sororail_common::storage`.
+**State expires.** Soroban archives entries that are not extended. Mutating
+entry points extend the instance TTL, while read-only views do not write a
+ledger entry. Integrators operating grants, streams, subscriptions, or
+escrows longer than 30 days should schedule the contract's public `bump()`
+entry point before expiry. A caller pays the normal transaction and ledger
+write fees; if the instance has already been archived, it must first be
+restored through the network's archival-state restoration flow.
+
+
+## Contract Immutability and Migration
+
+Soroban contracts are immutable once deployed. This means that contract logic cannot be directly upgraded. Any changes to a contract (bug fixes, feature additions) require deploying a new contract instance.
+
+#### Migration Plan:
+
+When a new version of a SoroRail contract is deployed, existing contracts will continue to function under their original logic. Users or integrated applications will need to:
+
+1.  **Deploy New Instances:** New instances of the upgraded contracts must be deployed.
+2.  **Migrate Funds/State:** For contracts that hold funds or state (e.g., `escrow`, `stream`, `vesting`, `recurring`), a migration strategy is necessary. This typically involves:
+    *   **Draining Old Contracts:** Encouraging users to withdraw all funds or complete all operations on the old contract instance.
+    *   **New Interactions:** Directing new interactions and deployments to the new contract instances.
+    *   **Wrapper Contracts/SDK Updates:** Providing wrapper contracts or SDK updates to facilitate interaction with the new contract versions, potentially abstracting away the underlying contract address changes.
+
+Due to the immutable nature, careful planning and communication are essential for any contract upgrades to ensure a smooth transition for users.
 
 ## Testing requirements
 
@@ -111,7 +132,7 @@ Non-negotiable — this is what makes the contracts credible as a dependency:
   remaining always equals deposited, exactly, with no rounding leakage.
 - Integration tests in `tests/` deploying real token contracts over full
   lifecycles.
-- ≥90% line coverage, enforced in CI.
+- ≥90% line coverage plus region/function floors, enforced in CI.
 
 ## Status
 
@@ -127,6 +148,8 @@ Non-negotiable — this is what makes the contracts credible as a dependency:
 - [x] Coverage measured: 98.66% lines, against the ≥90% gate
 - [x] Testnet deployment, addresses recorded in [DEPLOYMENTS.md](DEPLOYMENTS.md)
 - [ ] `MAX_RECIPIENTS` re-measured against testnet (see below)
+- [ ] Crate names reserved on crates.io — tracked per-crate in
+      [DEPLOYMENTS.md](DEPLOYMENTS.md#cratesio-publication)
 
 ### Known gaps
 
@@ -153,3 +176,8 @@ scoped so that someone new to Soroban can complete them.
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+
+## Updates
+
+Updated documentation for recent changes.
