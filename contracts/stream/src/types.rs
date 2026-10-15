@@ -16,6 +16,18 @@ use sororail_common::{math, Error};
 ///
 /// where `remaining` is what the contract still holds for this stream.
 ///
+/// # No rounding direction to pick
+///
+/// `vesting`'s proportional math (`total * elapsed / duration`) necessarily
+/// rounds, and documents that it rounds toward zero. Stream math never
+/// divides at all: [`Stream::accrued_at`] is pure multiplication
+/// (`rate_per_second * elapsed`), `top_up` rejects any amount that is not an
+/// exact multiple of `rate_per_second` rather than rounding it, and `extend`
+/// multiplies the added span by the rate rather than dividing an amount by
+/// it. So there is no rounding direction to document here -- the SPEC's "no
+/// rounding leakage" for this contract holds by construction, not by a
+/// rounding rule that happens to come out even.
+///
 /// # Accrual is never written
 ///
 /// There is no per-second state. Accrual is computed from the ledger

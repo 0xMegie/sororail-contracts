@@ -162,6 +162,25 @@ fn accrual_reports_overflow_rather_than_wrapping() {
     assert_eq!(s.accrued_at(START + 2), Err(Error::Overflow));
 }
 
+#[test]
+fn accrual_is_exact_at_a_rate_and_elapsed_that_divide_badly() {
+    // Unlike vesting's `total * elapsed / duration`, accrual never divides,
+    // so there is no rounding direction to get wrong: it is always exactly
+    // `rate * elapsed`, even for a rate/elapsed pair that would leave a
+    // remainder under any proportional (divide-then-multiply) formulation.
+    let env = Env::default();
+    let mut s = bare(&env);
+    s.rate_per_second = 7; // prime; divides unevenly into most spans
+    s.stop = START + 3; // an odd, non-multiple-of-7 span
+    s.deposited = 7 * 3;
+
+    assert_eq!(s.accrued_at(START + 1), Ok(7));
+    assert_eq!(s.accrued_at(START + 2), Ok(14));
+    assert_eq!(s.accrued_at(START + 3), Ok(21));
+    // Capped at `stop`, not truncated to some lower rounded figure.
+    assert_eq!(s.accrued_at(START + 3), Ok(s.deposited));
+}
+
 // ------------------------------------------------------------------ create
 
 #[test]

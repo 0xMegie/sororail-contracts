@@ -59,12 +59,23 @@ impl EscrowContract {
     }
 
     /// Pulls the agreed amount from the depositor into the contract.
+    ///
+    /// Rejected once `deadline` has passed (inclusive, matching the boundary
+    /// at which the depositor's unilateral refund right begins): funding an
+    /// agreement that has already lapsed would only let the depositor pull
+    /// their own funds right back out via `refund`, so it is refused up
+    /// front with [`Error::DeadlinePassed`] rather than the generic
+    /// [`Error::EscrowClosed`], which describes a *terminal* state and would
+    /// be misleading here -- a never-funded, lapsed escrow is still `Created`.
     pub fn fund(env: Env) -> Result<(), Error> {
         let mut escrow = storage::load(&env)?;
         if escrow.state.is_terminal() {
             return Err(Error::EscrowClosed);
         }
         auth::require(escrow.state == State::Created, Error::EscrowNotFundable)?;
+        if env.ledger().timestamp() >= escrow.deadline {
+            return Err(Error::DeadlinePassed);
+        }
         escrow.depositor.require_auth();
 
         escrow.state = State::Funded;
@@ -158,6 +169,13 @@ impl EscrowContract {
     /// the remainder goes to the depositor. The remainder is computed by
     /// subtraction, so the two payments always sum to exactly the escrowed
     /// amount with no rounding leakage.
+    ///
+    /// `arbiter` is checked again here even though `dispute` already refused
+    /// to reach `Disputed` without one (`arbiter` is set once at `init` and
+    /// never cleared, so this can't currently be reached any other way).
+    /// Defense-in-depth: if that invariant were ever weakened, this is what
+    /// turns a missing arbiter into [`Error::EscrowNoArbiter`] instead of
+    /// a call to `require_auth` on an address that was never meant to act.
     pub fn resolve(env: Env, split_bps: u32) -> Result<(), Error> {
         let mut escrow = storage::load(&env)?;
         auth::require(escrow.state == State::Disputed, Error::EscrowNotDisputed)?;

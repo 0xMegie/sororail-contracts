@@ -213,6 +213,35 @@ fn fund_rejects_a_closed_escrow() {
     assert_eq!(f.client.try_fund(), Err(Ok(Error::EscrowClosed)));
 }
 
+#[test]
+fn fund_rejects_after_the_deadline_with_a_dedicated_error() {
+    // Not `EscrowClosed`: the escrow is still `Created`, never funded, so
+    // "closed" would misdescribe why the call failed.
+    let f = Fixture::new(true);
+    f.advance_past_deadline();
+    assert_eq!(f.client.try_fund(), Err(Ok(Error::DeadlinePassed)));
+    assert_eq!(f.escrow_balance(), 0);
+    assert_eq!(f.client.state(), State::Created);
+}
+
+#[test]
+fn fund_at_exactly_the_deadline_is_rejected() {
+    // Boundary: matches `refund_at_exactly_the_deadline_is_allowed` -- the
+    // instant the depositor's unilateral refund right begins is also the
+    // instant funding stops being allowed.
+    let f = Fixture::new(true);
+    f.env.ledger().with_mut(|l| l.timestamp = DEADLINE);
+    assert_eq!(f.client.try_fund(), Err(Ok(Error::DeadlinePassed)));
+}
+
+#[test]
+fn fund_just_before_the_deadline_succeeds() {
+    let f = Fixture::new(true);
+    f.env.ledger().with_mut(|l| l.timestamp = DEADLINE - 1);
+    f.client.fund();
+    assert_eq!(f.client.state(), State::Funded);
+}
+
 // --------------------------------------------------------------- release
 
 #[test]
@@ -418,6 +447,26 @@ fn resolve_requires_a_dispute() {
     assert_eq!(
         f.client.try_resolve(&5_000),
         Err(Ok(Error::EscrowNotDisputed))
+    );
+}
+
+#[test]
+fn resolve_guards_against_a_missing_arbiter_even_if_disputed_is_reached() {
+    // `dispute` already refuses to run without an arbiter
+    // (`dispute_requires_an_arbiter`), so this state is unreachable through
+    // the public API. `resolve` re-checks anyway as defense-in-depth --
+    // this proves that check actually fires, rather than trusting it's dead
+    // code that happens to compile.
+    let f = Fixture::funded(false);
+    f.env.as_contract(&f.client.address, || {
+        let mut escrow = crate::storage::load(&f.env).unwrap();
+        escrow.state = State::Disputed;
+        crate::storage::save(&f.env, &escrow);
+    });
+
+    assert_eq!(
+        f.client.try_resolve(&5_000),
+        Err(Ok(Error::EscrowNoArbiter))
     );
 }
 

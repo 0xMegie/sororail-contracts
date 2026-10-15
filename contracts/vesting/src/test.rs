@@ -30,6 +30,10 @@ impl Fixture<'_> {
     }
 
     fn with_schedule(revocable: bool, cliff: u64, duration: u64) -> Self {
+        Fixture::with_schedule_at(START, cliff, duration, revocable)
+    }
+
+    fn with_schedule_at(start: u64, cliff: u64, duration: u64, revocable: bool) -> Self {
         let env = Env::default();
         env.mock_all_auths();
         env.ledger().with_mut(|l| l.timestamp = START);
@@ -46,7 +50,7 @@ impl Fixture<'_> {
             &beneficiary,
             &token_address,
             &TOTAL,
-            &START,
+            &start,
             &cliff,
             &duration,
             &revocable,
@@ -181,6 +185,33 @@ fn vesting_reports_overflow_rather_than_wrapping() {
     assert_eq!(g.vested_amount(START + 500), Err(Error::Overflow));
 }
 
+#[test]
+fn vested_amount_never_underflows_with_a_start_near_u64_max() {
+    // `elapsed = effective - self.start` is a u64 subtraction before the
+    // cast to i128; if `effective` could ever fall below `start`, this
+    // would panic in debug builds (or wrap in release) rather than return
+    // an `Error`. `VestingContract::create` rejects any schedule whose
+    // `start + duration` would overflow, which is what keeps `end` (and so
+    // `effective`, which is always clamped below it) from ever landing
+    // below `start` here.
+    let env = Env::default();
+    let g = Grant {
+        grantor: Address::generate(&env),
+        beneficiary: Address::generate(&env),
+        token: Address::generate(&env),
+        total: TOTAL,
+        start: u64::MAX - 1,
+        cliff: 0,
+        duration: 1,
+        revocable: true,
+        claimed: 0,
+        returned: 0,
+        revoked_at: None,
+    };
+    assert_eq!(g.vested_amount(u64::MAX - 1), Ok(0));
+    assert_eq!(g.vested_amount(u64::MAX), Ok(TOTAL));
+}
+
 // ------------------------------------------------------------------ create
 
 #[test]
@@ -249,6 +280,31 @@ fn create_rejects_a_cliff_after_the_end() {
         ),
         Err(Ok(Error::VestingCliffAfterEnd))
     );
+}
+
+#[test]
+fn create_rejects_a_schedule_whose_end_would_overflow_u64() {
+    // `start + duration` must be representable, or `end_at`'s
+    // `saturating_add` would silently cap it and `vested_amount` would be
+    // evaluated against a shortened schedule instead of erroring up front.
+    let env = Env::default();
+    env.mock_all_auths();
+    let c = VestingContractClient::new(&env, &env.register(VestingContract, ()));
+    let (a, b, t) = (
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+    );
+    assert_eq!(
+        c.try_create(&a, &b, &t, &TOTAL, &u64::MAX, &0, &1, &true),
+        Err(Ok(Error::VestingScheduleOverflow))
+    );
+}
+
+#[test]
+fn create_accepts_a_schedule_whose_end_is_exactly_u64_max() {
+    let f = Fixture::with_schedule_at(u64::MAX - 1, 0, 1, true);
+    assert_eq!(f.client.get().duration, 1);
 }
 
 #[test]

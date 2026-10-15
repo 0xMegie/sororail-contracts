@@ -72,6 +72,15 @@ impl Grant {
 
         // Linear in between. `duration` is non-zero because `end > effective
         // >= cliff_at >= start` implies `end > start`.
+        //
+        // `effective - self.start` cannot underflow: `effective >= cliff_at
+        // >= start` always holds (the branches above return before this
+        // point whenever `effective < cliff_at`). The `saturating_add` calls
+        // above are what make `cliff_at`/`end` well-defined rather than
+        // panicking on an unvalidated `Grant`, but `VestingContract::create`
+        // additionally rejects any `start + duration` that would need that
+        // saturation, so for a grant created through the contract, `end` is
+        // always the true, non-saturated sum.
         let elapsed = (effective - self.start) as i128;
         math::mul_div(self.total, elapsed, self.duration as i128)
     }
