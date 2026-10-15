@@ -4,10 +4,10 @@
 
 use soroban_sdk::{
     testutils::{Address as _, Events as _},
-    token::{StellarAssetClient, TokenClient},
+    token::TokenClient,
     vec, Address, Env, Vec,
 };
-use sororail_common::Error;
+use sororail_common::{testutils::TestEnv, Error};
 
 use crate::{
     contract::{BatchPayoutContract, BatchPayoutContractClient},
@@ -26,13 +26,10 @@ struct Fixture<'a> {
 
 impl Fixture<'_> {
     fn new() -> Self {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let funder = Address::generate(&env);
-        let issuer = Address::generate(&env);
-        let token_address = env.register_stellar_asset_contract_v2(issuer).address();
-        StellarAssetClient::new(&env, &token_address).mint(&funder, &MINT);
+        let te = TestEnv::new();
+        let (token, funder) = te.make_token(MINT);
+        let token_address = token.address.clone();
+        let env = te.env().clone();
 
         let client = BatchPayoutContractClient::new(&env, &env.register(BatchPayoutContract, ()));
         Fixture {
