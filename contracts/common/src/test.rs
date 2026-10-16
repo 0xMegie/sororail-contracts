@@ -27,6 +27,25 @@ fn add_sub_mul_are_checked() {
 }
 
 #[test]
+fn sub_underflow_returns_error() {
+    assert_eq!(math::sub(i128::MIN, 1), Err(Error::Underflow));
+    assert_eq!(math::sub(i128::MIN, i128::MAX), Err(Error::Underflow));
+    // Sanity: the lowest representable subtraction still succeeds.
+    assert_eq!(math::sub(i128::MIN + 1, 1), Ok(i128::MIN));
+}
+
+#[test]
+fn mul_at_i128_boundary_returns_overflow() {
+    assert_eq!(math::mul(i128::MAX, 2), Err(Error::Overflow));
+    assert_eq!(math::mul(i128::MIN, 2), Err(Error::Overflow));
+    assert_eq!(math::mul(i128::MIN, -1), Err(Error::Overflow));
+    assert_eq!(math::mul(i128::MAX, i128::MAX), Err(Error::Overflow));
+    // Sanity: boundary multiplications that fit still succeed.
+    assert_eq!(math::mul(i128::MAX, 1), Ok(i128::MAX));
+    assert_eq!(math::mul(i128::MIN, 1), Ok(i128::MIN));
+}
+
+#[test]
 fn div_rejects_zero_divisor() {
     assert_eq!(math::div(10, 2), Ok(5));
     assert_eq!(math::div(10, 0), Err(Error::DivisionByZero));
