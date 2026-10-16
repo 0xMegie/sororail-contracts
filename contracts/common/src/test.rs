@@ -35,6 +35,14 @@ fn div_rejects_zero_divisor() {
 }
 
 #[test]
+fn div_rounds_toward_zero() {
+    // Rounds toward zero, not toward negative infinity: -7 / 2 is -3, not -4.
+    assert_eq!(math::div(-7, 2), Ok(-3));
+    assert_eq!(math::div(7, -2), Ok(-3));
+    assert_eq!(math::div(-7, -2), Ok(3));
+}
+
+#[test]
 fn mul_div_reports_overflow_rather_than_truncating() {
     assert_eq!(math::mul_div(100, 50, 200), Ok(25));
     // Rounds toward zero, never up.
@@ -51,6 +59,15 @@ fn mul_bps_rejects_out_of_range() {
         math::mul_bps(1_000, MAX_BPS + 1),
         Err(Error::InvalidBasisPoints)
     );
+}
+
+#[test]
+fn mul_bps_at_full_bps_returns_the_whole_amount() {
+    // 10000 bps is 100%, so the result must equal the input exactly, with no
+    // rounding loss, regardless of whether the amount divides evenly.
+    assert_eq!(math::mul_bps(1, MAX_BPS), Ok(1));
+    assert_eq!(math::mul_bps(9_999, MAX_BPS), Ok(9_999));
+    assert_eq!(math::mul_bps(i128::MAX / 10_000, MAX_BPS), Ok(i128::MAX / 10_000));
 }
 
 #[test]
@@ -128,6 +145,13 @@ fn min_picks_the_smaller() {
     assert_eq!(math::min(3, 9), 3);
     assert_eq!(math::min(9, 3), 3);
     assert_eq!(math::min(-1, 0), -1);
+}
+
+#[test]
+fn min_with_equal_inputs_returns_that_value() {
+    assert_eq!(math::min(5, 5), 5);
+    assert_eq!(math::min(0, 0), 0);
+    assert_eq!(math::min(-3, -3), -3);
 }
 
 #[test]
@@ -213,6 +237,13 @@ fn require_reports_the_given_error() {
         auth::require(false, Error::InvalidState),
         Err(Error::InvalidState)
     );
+}
+
+#[test]
+fn require_with_false_condition_errors_with_the_given_variant() {
+    // The error returned must be whatever the caller passed, not a fixed one.
+    assert_eq!(auth::require(false, Error::InvalidAmount), Err(Error::InvalidAmount));
+    assert_eq!(auth::require(false, Error::EscrowClosed), Err(Error::EscrowClosed));
 }
 
 #[test]
