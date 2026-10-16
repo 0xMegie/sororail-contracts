@@ -1,12 +1,7 @@
 use soroban_sdk::{
     testutils::{storage::Instance as _, Address as _, Events as _, Ledger as _},
- test/consolidate-contract-helpers-and-stable-ids
-    token::TokenClient,
-    Address, Env,
-
     token::{StellarAssetClient, TokenClient},
     Address, Env, Event,
- main
 };
 use sororail_common::{storage::INSTANCE_BUMP, testutils::TestEnv, Error};
 
@@ -531,6 +526,28 @@ fn refund_by_arbiter_is_allowed_before_the_deadline() {
 }
 
 #[test]
+fn refund_moves_the_funded_tokens_back_to_the_depositor() {
+    // The other refund tests check `escrow_balance()` and `state()` but
+    // never that the depositor's own balance actually went back up -- a
+    // regression that zeroed the escrow without paying anyone would still
+    // pass those (#256). Covers both callers the funds can move under:
+    // the depositor themselves (after the deadline) and the arbiter (at
+    // any time).
+    let f = Fixture::funded(true);
+    let depositor_before = f.token.balance(&f.depositor);
+    f.advance_past_deadline();
+    f.client.refund(&f.depositor);
+    assert_eq!(f.token.balance(&f.depositor), depositor_before + AMOUNT);
+    assert_eq!(f.escrow_balance(), 0);
+
+    let g = Fixture::funded(true);
+    let depositor_before = g.token.balance(&g.depositor);
+    g.client.refund(&g.arbiter);
+    assert_eq!(g.token.balance(&g.depositor), depositor_before + AMOUNT);
+    assert_eq!(g.escrow_balance(), 0);
+}
+
+#[test]
 fn refund_is_not_callable_by_the_beneficiary_or_an_outsider() {
     let f = Fixture::funded(true);
     f.advance_past_deadline();
@@ -607,6 +624,19 @@ fn dispute_requires_funding_first() {
     assert_eq!(
         f.client.try_dispute(&f.depositor),
         Err(Ok(Error::EscrowNotFunded))
+    );
+}
+
+#[test]
+fn dispute_rejects_an_already_released_escrow() {
+    // `release` is terminal, so `require_funded` must reject it with
+    // `EscrowClosed` rather than `EscrowNotFunded` -- a released escrow is
+    // closed, not simply never-funded (#257).
+    let f = Fixture::funded(true);
+    f.client.release(&f.depositor);
+    assert_eq!(
+        f.client.try_dispute(&f.depositor),
+        Err(Ok(Error::EscrowClosed))
     );
 }
 
