@@ -90,7 +90,11 @@ impl Stream {
 
     /// Accrued but not yet withdrawn, as of `at`. What the recipient can take.
     pub fn available_at(&self, at: u64) -> Result<i128, Error> {
-        math::sub(self.accrued_at(at)?, self.withdrawn)
+        let accrued = self.accrued_at(at)?;
+        if self.withdrawn > accrued {
+            return Err(Error::Underflow);
+        }
+        math::sub(accrued, self.withdrawn)
     }
 
     /// What the contract still holds for this stream.

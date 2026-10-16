@@ -44,8 +44,16 @@ impl Fixture<'_> {
     /// Builds an initialized escrow. `with_arbiter` controls whether the
     /// dispute path is available.
     fn new(with_arbiter: bool) -> Self {
+        Self::with_amount(with_arbiter, AMOUNT)
+    }
+
+    fn with_amount(with_arbiter: bool, amount: i128) -> Self {
         let te = TestEnv::at(START_TS);
-        let (token, depositor) = te.make_token(AMOUNT * 10);
+        let (token, depositor) = te.make_token(
+            amount
+                .checked_mul(10)
+                .expect("test token mint amount remains in range"),
+        );
         let token_address = token.address.clone();
         let beneficiary = te.make_address();
         let arbiter = te.make_address();
@@ -64,7 +72,7 @@ impl Fixture<'_> {
                 None
             },
             &token_address,
-            &AMOUNT,
+            &amount,
             &DEADLINE,
         );
 
@@ -81,6 +89,12 @@ impl Fixture<'_> {
 
     fn funded(with_arbiter: bool) -> Self {
         let f = Fixture::new(with_arbiter);
+        f.client.fund();
+        f
+    }
+
+    fn funded_amount(amount: i128) -> Self {
+        let f = Fixture::with_amount(true, amount);
         f.client.fund();
         f
     }
@@ -814,6 +828,45 @@ fn resolve_conserves_the_escrowed_amount_at_every_split() {
         );
         assert_eq!(f.escrow_balance(), 0, "{bps}bps split stranded funds");
         assert!(to_beneficiary >= 0 && to_depositor >= 0);
+    }
+}
+
+mod resolve_properties {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        #[test]
+        fn resolve_conserves_amount_for_any_split(
+            amount in 1i128..=1_000_000_000_000,
+            bps in 0u32..=10_000,
+        ) {
+            let f = Fixture::funded_amount(amount);
+            let depositor_before = f.token.balance(&f.depositor);
+            f.client.dispute(&f.depositor);
+            f.client.resolve(&bps);
+
+            let paid_to_beneficiary = f.token.balance(&f.beneficiary);
+            let paid_to_depositor = f
+                .token
+                .balance(&f.depositor)
+                .checked_sub(depositor_before)
+                .expect("depositor balance delta remains in range");
+            let total_paid = paid_to_beneficiary
+                .checked_add(paid_to_depositor)
+                .expect("total paid remains in range");
+            prop_assert_eq!(
+                total_paid,
+                amount,
+                "amount {}, split {}bps",
+                amount,
+                bps
+            );
+            prop_assert_eq!(f.escrow_balance(), 0, "resolved escrow retained funds");
+        }
     }
 }
 

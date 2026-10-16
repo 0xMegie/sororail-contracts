@@ -323,11 +323,7 @@ fn create_allows_the_exact_max_funding_boundary() {
     let (token_client, sender) = te.make_token(i128::MAX);
     let token = token_client.address.clone();
     let recipient = te.make_address();
- test/consolidate-contract-helpers-and-stable-ids
     let env = te.env().clone();
-
-    let env = te.env.clone();
- main
     let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
 
     c.create(
@@ -415,11 +411,7 @@ fn create_reverts_cleanly_when_sender_cannot_fund() {
     let (token_client, sender) = te.make_token(RATE);
     let token = token_client.address.clone();
     let recipient = te.make_address();
- test/consolidate-contract-helpers-and-stable-ids
     let env = te.env().clone();
-
-    let env = te.env.clone();
- main
     let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
 
     assert!(c
@@ -472,6 +464,8 @@ fn create_rejects_multiple_invalid_args_in_order() {
     let recipient = Address::generate(&env);
     let issuer = Address::generate(&env);
     let token = env.register_stellar_asset_contract_v2(issuer).address();
+    let funding = RATE * i128::from(STOP - START);
+    StellarAssetClient::new(&env, &token).mint(&sender, &funding);
     let contract_id = env.register(StreamContract, ());
     let client = StreamContractClient::new(&env, &contract_id);
 
@@ -811,11 +805,7 @@ fn top_up_rejects_a_span_that_overflows_the_stop_timestamp() {
     let (token_client, sender) = te.make_token(i128::MAX);
     let token = token_client.address.clone();
     let recipient = te.make_address();
- test/consolidate-contract-helpers-and-stable-ids
     let env = te.env().clone();
-
-    let env = te.env.clone();
- main
     let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
     c.create(&sender, &recipient, &token, &1, &START, &(START + 1), &true);
 
@@ -1004,37 +994,37 @@ fn conservation_holds_across_a_full_mixed_lifecycle() {
 fn deposited_calculation_matches_across_top_ups_and_extends() {
     let f = Fixture::new(true);
     let mut s = f.client.get();
-    assert_eq!(s.deposited, RATE * (s.stop - s.start) as i128);
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
 
     // First top_up: add 100 seconds of funding
     f.client.top_up(&(RATE * 100));
     s = f.client.get();
-    assert_eq!(s.deposited, RATE * (s.stop - s.start) as i128);
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
 
     // First extend: move stop forward by 50 seconds
     f.client.extend(&(s.stop + 50));
     s = f.client.get();
-    assert_eq!(s.deposited, RATE * (s.stop - s.start) as i128);
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
 
     // Second top_up: add 200 seconds
     f.client.top_up(&(RATE * 200));
     s = f.client.get();
-    assert_eq!(s.deposited, RATE * (s.stop - s.start) as i128);
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
 
     // Second extend: move stop forward by 75 seconds
     f.client.extend(&(s.stop + 75));
     s = f.client.get();
-    assert_eq!(s.deposited, RATE * (s.stop - s.start) as i128);
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
 
     // Third top_up: add 150 seconds
     f.client.top_up(&(RATE * 150));
     s = f.client.get();
-    assert_eq!(s.deposited, RATE * (s.stop - s.start) as i128);
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
 
     // Third extend: move stop forward by 300 seconds
     f.client.extend(&(s.stop + 300));
     s = f.client.get();
-    assert_eq!(s.deposited, RATE * (s.stop - s.start) as i128);
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
 
     // Verify conservation still holds after all operations
     f.assert_conserved();
@@ -1110,7 +1100,7 @@ mod accrued_at_properties {
         ) {
             let env = Env::default();
             let stop = start + span;
-            let deposited = rate_per_second * span as i128;
+            let deposited = rate_per_second * i128::from(span);
 
             let stream = Stream {
                 rate_per_second,
@@ -1144,7 +1134,7 @@ mod accrued_at_properties {
         ) {
             let env = Env::default();
             let stop = start + span;
-            let deposited = rate_per_second * span as i128;
+            let deposited = rate_per_second * i128::from(span);
             let cancelled_at = start.saturating_add(cancel_offset).min(stop);
 
             let stream = Stream {

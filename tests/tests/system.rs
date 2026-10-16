@@ -219,6 +219,142 @@ fn an_operations_month_conserves_every_token() {
     s.assert_nothing_lost(&parties);
 }
 
+/// Init, fund, dispute, and resolve an escrow while tracking every balance.
+#[test]
+fn escrow_dispute_resolution_completes_the_lifecycle() {
+    let s = System::new();
+    let beneficiary = Address::generate(&s.env);
+    let arbiter = Address::generate(&s.env);
+    let amount = 2_000_003;
+    let parties = [&beneficiary, &arbiter];
+    let deadline = START + MONTH;
+
+    s.escrow.init(
+        &s.employer,
+        &beneficiary,
+        &Some(arbiter.clone()),
+        &s.token.address,
+        &amount,
+        &deadline,
+    );
+    assert_eq!(s.escrow.state(), sororail_escrow::State::Created);
+    assert_eq!(s.balance(&s.escrow.address), 0);
+    assert_eq!(s.balance(&s.employer), MINT);
+    s.assert_nothing_lost(&parties);
+
+    s.escrow.fund();
+    assert_eq!(s.escrow.state(), sororail_escrow::State::Funded);
+    assert_eq!(s.balance(&s.escrow.address), amount);
+    assert_eq!(s.balance(&s.employer), MINT - amount);
+    s.assert_nothing_lost(&parties);
+
+    s.escrow.dispute(&beneficiary);
+    assert_eq!(s.escrow.state(), sororail_escrow::State::Disputed);
+    assert_eq!(s.balance(&s.escrow.address), amount);
+    assert_eq!(s.balance(&beneficiary), 0);
+    s.assert_nothing_lost(&parties);
+
+    s.escrow.resolve(&2_500);
+    let beneficiary_share = 500_000;
+    let depositor_share = amount - beneficiary_share;
+    assert_eq!(s.escrow.state(), sororail_escrow::State::Resolved);
+    assert_eq!(s.balance(&s.escrow.address), 0);
+    assert_eq!(s.balance(&beneficiary), beneficiary_share);
+    assert_eq!(s.balance(&s.employer), MINT - beneficiary_share);
+    assert_eq!(s.balance(&arbiter), 0);
+    assert_eq!(beneficiary_share + depositor_share, amount);
+    s.assert_nothing_lost(&parties);
+}
+
+/// Top-up, partial withdrawal, and cancellation settle/refund the exact remainder.
+#[test]
+fn stream_top_up_withdraw_and_cancel_complete_the_lifecycle() {
+    let s = System::new();
+    let recipient = Address::generate(&s.env);
+    let parties = [&recipient];
+
+    s.stream.create(
+        &s.employer,
+        &recipient,
+        &s.token.address,
+        &10,
+        &START,
+        &(START + 100),
+        &true,
+    );
+    assert_eq!(s.balance(&s.stream.address), 1_000);
+    assert_eq!(s.balance(&s.employer), MINT - 1_000);
+    s.assert_nothing_lost(&parties);
+
+    s.stream.top_up(&500);
+    assert_eq!(s.stream.get().stop, START + 150);
+    assert_eq!(s.balance(&s.stream.address), 1_500);
+    assert_eq!(s.balance(&s.employer), MINT - 1_500);
+    s.assert_nothing_lost(&parties);
+
+    s.at(START + 50);
+    assert_eq!(s.stream.withdraw(&None), 500);
+    assert_eq!(s.balance(&recipient), 500);
+    assert_eq!(s.balance(&s.stream.address), 1_000);
+    s.assert_nothing_lost(&parties);
+
+    s.at(START + 100);
+    s.stream.cancel();
+    assert_eq!(s.balance(&recipient), 1_000);
+    assert_eq!(s.balance(&s.stream.address), 0);
+    assert_eq!(s.balance(&s.employer), MINT - 1_000);
+    assert_eq!(s.stream.remaining(), 0);
+    s.assert_nothing_lost(&parties);
+}
+
+/// Claims are blocked before the cliff, then accrue at and after the cliff.
+#[test]
+fn vesting_claims_track_amounts_across_the_cliff() {
+    let s = System::new();
+    let beneficiary = Address::generate(&s.env);
+    let parties = [&beneficiary];
+    let total = 1_000_000;
+    let cliff = 250;
+    let duration = 1_000;
+
+    s.vesting.create(
+        &s.employer,
+        &beneficiary,
+        &s.token.address,
+        &total,
+        &START,
+        &cliff,
+        &duration,
+        &true,
+    );
+    assert_eq!(s.balance(&s.vesting.address), total);
+    s.assert_nothing_lost(&parties);
+
+    s.at(START + cliff - 1);
+    assert_eq!(s.vesting.claimable(), 0);
+    assert_eq!(
+        s.vesting.try_claim(),
+        Err(Ok(sororail_common::Error::VestingCliffNotReached))
+    );
+    assert_eq!(s.balance(&beneficiary), 0);
+    assert_eq!(s.balance(&s.vesting.address), total);
+    s.assert_nothing_lost(&parties);
+
+    s.at(START + cliff);
+    assert_eq!(s.vesting.claimable(), 250_000);
+    assert_eq!(s.vesting.claim(), 250_000);
+    assert_eq!(s.balance(&beneficiary), 250_000);
+    assert_eq!(s.balance(&s.vesting.address), 750_000);
+    s.assert_nothing_lost(&parties);
+
+    s.at(START + cliff + 250);
+    assert_eq!(s.vesting.claimable(), 250_000);
+    assert_eq!(s.vesting.claim(), 250_000);
+    assert_eq!(s.balance(&beneficiary), 500_000);
+    assert_eq!(s.balance(&s.vesting.address), 500_000);
+    s.assert_nothing_lost(&parties);
+}
+
 /// Right after `create`, the stream contract holds exactly what was
 /// deposited for it -- no more (over-funded from elsewhere) and no less
 /// (a partial transfer that still reported success).
@@ -230,10 +366,17 @@ fn stream_holds_exactly_the_deposit_after_create() {
     let rate = 2;
     let start = START;
     let stop = START + YEAR;
-    s.stream
-        .create(&s.employer, &dave, &s.token.address, &rate, &start, &stop, &true);
+    s.stream.create(
+        &s.employer,
+        &dave,
+        &s.token.address,
+        &rate,
+        &start,
+        &stop,
+        &true,
+    );
 
-    let deposit = rate * (stop - start) as i128;
+    let deposit = rate * i128::from(stop - start);
     assert_eq!(s.stream.get().deposited, deposit);
     assert_eq!(s.balance(&s.stream.address), deposit);
 }
@@ -327,9 +470,18 @@ fn each_contracts_instance_ttl_survives_a_long_ledger_advance() {
         .ledger()
         .set_sequence_number(current + 10 * instance_bump_ledgers);
 
-    assert!(s.vesting.try_get().is_ok(), "vesting instance unreachable after TTL advance");
-    assert!(s.stream.try_get().is_ok(), "stream instance unreachable after TTL advance");
-    assert!(s.escrow.try_get().is_ok(), "escrow instance unreachable after TTL advance");
+    assert!(
+        s.vesting.try_get().is_ok(),
+        "vesting instance unreachable after TTL advance"
+    );
+    assert!(
+        s.stream.try_get().is_ok(),
+        "stream instance unreachable after TTL advance"
+    );
+    assert!(
+        s.escrow.try_get().is_ok(),
+        "escrow instance unreachable after TTL advance"
+    );
     assert!(
         s.recurring.try_get().is_ok(),
         "recurring instance unreachable after TTL advance"
