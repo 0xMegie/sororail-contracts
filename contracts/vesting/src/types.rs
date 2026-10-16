@@ -42,21 +42,32 @@ pub struct Grant {
     pub beneficiary: Address,
     /// The token being vested.
     pub token: Address,
-    /// Total ever funded.
+    /// Total ever funded, in the token's smallest unit (e.g., stroops for XLM,
+    /// or the base unit defined by the token's decimals).
     pub total: i128,
-    /// Ledger timestamp at which the schedule begins.
+    /// Ledger timestamp at which the schedule begins, in seconds since the
+    /// Unix epoch. The absolute cliff timestamp is `start + cliff`, and the
+    /// absolute end timestamp is `start + duration`.
     pub start: u64,
-    /// Seconds after `start` before anything vests.
+    /// Seconds after `start` before anything vests. Nothing vests before the
+    /// absolute timestamp `start + cliff`. At that moment, the proportion of
+    /// `total` corresponding to elapsed time vests in one step. If `cliff ==
+    /// 0`, vesting begins linearly from `start` with no cliff. If `cliff ==
+    /// duration`, the entire grant vests at once at `start + duration`.
     pub cliff: u64,
-    /// Seconds after `start` at which the grant is fully vested.
+    /// Seconds after `start` at which the grant is fully vested. The absolute
+    /// end timestamp is `start + duration`. Vesting is linear between the
+    /// cliff and the end.
     pub duration: u64,
     /// Whether the grantor may reclaim the unvested portion.
     pub revocable: bool,
-    /// Total ever claimed by the beneficiary.
+    /// Total ever claimed by the beneficiary, in the token's smallest unit.
     pub claimed: i128,
-    /// Total ever returned to the grantor on revocation.
+    /// Total ever returned to the grantor on revocation, in the token's
+    /// smallest unit.
     pub returned: i128,
-    /// When the grant was revoked, if it was. Vesting stops here.
+    /// When the grant was revoked, if it was, in seconds since the Unix epoch.
+    /// Vesting stops here.
     pub revoked_at: Option<u64>,
 }
 
