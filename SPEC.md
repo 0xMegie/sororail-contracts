@@ -237,6 +237,40 @@ The rule is set by how many parties may call an entry point:
 
 A `caller` argument exists only when the contract cannot otherwise know who is acting. It also records who acted in the emitted event (`released_by`, `refunded_by`, `raised_by`, `cancelled_by`). This is why `Unauthorized` appears only in the `escrow` and `recurring` error tables. Each contract's `errors.rs` explains why the variants it never returns are absent. The contributor-facing rules for picking a pattern are in [CONTRIBUTING.md](CONTRIBUTING.md#choosing-an-authorization-pattern).
 
+#### Authorization model, by entry point
+
+Every public function, and which address(es) may call it. "—" means the function is a read-only view with no authorization check at all.
+
+| Contract       | Function               | May call it                                                    |
+| -------------- | ----------------------- | --------------------------------------------------------------- |
+| `escrow`       | `init`                  | depositor                                                       |
+| `escrow`       | `cancel`                | depositor                                                       |
+| `escrow`       | `fund`                  | depositor                                                       |
+| `escrow`       | `release`               | depositor or arbiter                                            |
+| `escrow`       | `refund`                | depositor or arbiter (anyone, after the dispute grace period)   |
+| `escrow`       | `dispute`               | depositor or beneficiary                                        |
+| `escrow`       | `resolve`               | arbiter                                                         |
+| `escrow`       | `state`, `bump`, `get`  | —                                                                |
+| `stream`       | `create`                | sender                                                          |
+| `stream`       | `withdraw`              | recipient                                                       |
+| `stream`       | `cancel`                | sender                                                          |
+| `stream`       | `top_up`                | sender                                                          |
+| `stream`       | `extend`                | sender                                                          |
+| `stream`       | `balance_of`, `remaining`, `bump`, `get` | —                                               |
+| `vesting`      | `create`                | grantor                                                         |
+| `vesting`      | `claim`                 | beneficiary                                                     |
+| `vesting`      | `revoke`                | grantor                                                         |
+| `vesting`      | `vested_amount`, `claimable`, `schedule`, `remaining`, `bump`, `get` | —                      |
+| `recurring`    | `authorize`             | payer                                                           |
+| `recurring`    | `charge`                | payee                                                            |
+| `recurring`    | `cancel`                | payer or payee                                                  |
+| `recurring`    | `next_chargeable_at`, `is_chargeable`, `remaining_periods`, `bump`, `get` | —            |
+| `batch_payout` | `execute`               | funder                                                          |
+| `batch_payout` | `execute_equal`         | funder                                                          |
+| `batch_payout` | `max_recipients`, `preview` | —                                                           |
+
+A wrong caller on a privileged function above gets either an authorization failure from the host (single fixed party) or `Error::Unauthorized` (several permitted parties) — see the caller-vs-`require_auth` rule just above.
+
 #### Lifecycle modeling: explicit `State` enum vs. optional timestamps
 
 | Contract    | Lifecycle                                         | Representation                                                                     | "Still active?" helper                                |
