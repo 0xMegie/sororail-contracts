@@ -24,16 +24,34 @@ use soroban_sdk::{contracttype, Address};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum State {
     /// Configured, but the depositor has not transferred the funds yet.
+    ///
+    /// Reachable only from `init`. Transitions to `Funded` via `fund`, or to
+    /// `Refunded` via `cancel` (the depositor backing out before funding).
     Created = 0,
     /// Holding the funds, awaiting release, refund or dispute.
+    ///
+    /// Reached from `Created` via `fund`. Transitions to `Released` via
+    /// `release`, to `Refunded` via `refund`, or to `Disputed` via `dispute`
+    /// (only when an arbiter is configured).
     Funded = 1,
     /// Paid out to the beneficiary. Terminal.
+    ///
+    /// Reached from `Funded` via `release`.
     Released = 2,
     /// Returned to the depositor. Terminal.
+    ///
+    /// Reached from `Created` via `cancel`, from `Funded` via `refund`, or
+    /// from `Disputed` via `refund` (arbiter grace-period recovery).
     Refunded = 3,
     /// Frozen pending an arbiter decision.
+    ///
+    /// Reached from `Funded` via `dispute`. Transitions to `Resolved` via
+    /// `resolve`, or to `Refunded` via `refund` once the dispute grace
+    /// period has elapsed with no arbiter action.
     Disputed = 4,
     /// Split between the parties by the arbiter. Terminal.
+    ///
+    /// Reached from `Disputed` via `resolve`.
     Resolved = 5,
 }
 

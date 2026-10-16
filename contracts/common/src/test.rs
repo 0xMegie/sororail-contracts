@@ -313,3 +313,46 @@ fn require_auth_one_of_rejects_an_outsider() {
         Err(Error::Unauthorized)
     );
 }
+
+// ---------------------------------------------------------------- storage
+//
+// `impl_single_position_storage!` is a macro, not a function, so it is
+// exercised here against a throwaway key/type rather than against the
+// generated code of a real contract.
+
+mod storage_tests {
+    use soroban_sdk::{contract, contracttype, Env};
+
+    use crate::{impl_single_position_storage, Error};
+
+    #[contract]
+    struct StorageTestContract;
+
+    #[contracttype]
+    enum TestKey {
+        Value,
+    }
+
+    impl_single_position_storage!(u32, TestKey::Value);
+
+    #[test]
+    fn is_initialized_is_false_before_init_and_true_after() {
+        let env = Env::default();
+        let id = env.register(StorageTestContract, ());
+        env.as_contract(&id, || {
+            assert!(!is_initialized(&env));
+            save(&env, &1);
+            assert!(is_initialized(&env));
+        });
+    }
+
+    #[test]
+    fn load_view_on_an_uninitialized_contract_matches_load() {
+        let env = Env::default();
+        let id = env.register(StorageTestContract, ());
+        env.as_contract(&id, || {
+            assert_eq!(load_view(&env), Err(Error::NotInitialized));
+            assert_eq!(load(&env), Err(Error::NotInitialized));
+        });
+    }
+}
