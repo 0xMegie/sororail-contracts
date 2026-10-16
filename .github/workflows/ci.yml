@@ -61,6 +61,34 @@ jobs:
       - run: cargo nextest run --workspace
       - run: ./scripts/check_error_docs.sh
 
+  test-contracts:
+    name: test (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    # Runs each contract's test suite in its own job instead of one combined
+    # `cargo nextest run --workspace` (issue #287), so the suites execute
+    # concurrently and a failure in one contract doesn't hide the others'
+    # results behind it.
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - sororail-common
+          - sororail-escrow
+          - sororail-stream
+          - sororail-vesting
+          - sororail-recurring
+          - sororail-batch-payout
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: "1.97.1"
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: ${{ matrix.package }}
+      - uses: taiki-e/install-action@4765db214858792ed289a2b5e543daf93d682a48 # nextest
+      - run: cargo nextest run -p ${{ matrix.package }}
+
   doc:
     name: cargo doc
     runs-on: ubuntu-latest

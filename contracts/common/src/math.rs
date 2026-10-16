@@ -106,9 +106,13 @@ pub fn mul_bps(amount: i128, bps: u32) -> Result<i128, Error> {
 
 /// Splits `amount` into `(first, second)` where `first` is `bps` of the total.
 ///
-/// `second` is computed as the remainder rather than as `10000 - bps`, so the
-/// two parts always sum to exactly `amount` with no rounding leakage. This is
-/// the property escrow dispute resolution depends on.
+/// `first` is `mul_bps(amount, bps)`, truncated toward zero (see
+/// [`mul_bps`]). `second` is computed as `amount - first` rather than as
+/// `mul_bps(amount, 10000 - bps)`, so any remainder left over by that
+/// truncation always lands on `second` and the two parts always sum to
+/// exactly `amount` with no rounding leakage. Callers can rely on `second`
+/// being `>= amount * (10000 - bps) / 10000`, never less. This is the
+/// property escrow dispute resolution depends on.
 ///
 /// Currently used only by `escrow::resolve`. See module docs for rationale.
 ///

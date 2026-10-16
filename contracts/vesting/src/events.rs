@@ -4,7 +4,8 @@
 
 use soroban_sdk::{contractevent, Address};
 
-/// A grant was created and funded.
+/// Emitted once by `contract::create`, at grant creation, after the grant is
+/// saved and funds are transferred in.
 #[contractevent(topics = ["vesting", "created"])]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Created {
@@ -19,7 +20,9 @@ pub struct Created {
     pub revocable: bool,
 }
 
-/// The beneficiary claimed vested tokens.
+/// Emitted by `contract::claim` each time the beneficiary withdraws the
+/// currently-vested, unclaimed balance. Can fire multiple times over the
+/// life of a grant, once per successful claim.
 #[contractevent(topics = ["vesting", "claimed"])]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Claimed {
@@ -30,8 +33,10 @@ pub struct Claimed {
     pub total_claimed: i128,
 }
 
-/// The grantor revoked the grant, reclaiming the unvested portion. The vested
-/// portion remains claimable by the beneficiary.
+/// Emitted once by `contract::revoke`, when the grantor revokes a revocable
+/// grant. Fires at most once per grant: a second `revoke` call is rejected
+/// with `Error::VestingRevoked` before this event would be emitted again.
+/// The vested portion remains claimable by the beneficiary afterward.
 #[contractevent(topics = ["vesting", "revoked"])]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Revoked {
