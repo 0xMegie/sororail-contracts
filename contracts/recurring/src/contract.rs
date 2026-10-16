@@ -157,7 +157,7 @@ impl RecurringContract {
     /// The earliest timestamp at which the next charge may be taken.
     ///
     /// Reports the stored schedule regardless of whether the authorization is
-    /// cancelled or exhausted; check [`Self::is_chargeable`] for whether a
+    /// cancelled or exhausted; check `is_chargeable` for whether a
     /// charge would actually succeed.
     pub fn next_chargeable_at(env: Env) -> Result<u64, Error> {
         Ok(storage::load_view(&env)?.next_chargeable_at)

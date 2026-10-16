@@ -172,7 +172,7 @@ fn a_zero_cliff_vests_linearly_from_the_start() {
     let env = Env::default();
     let g = bare(&env, 0, DURATION);
     assert_eq!(g.vested_amount(START), Ok(0));
-    assert_eq!(g.vested_amount(START + 1), Ok(TOTAL / DURATION as i128));
+    assert_eq!(g.vested_amount(START + 1), Ok(TOTAL / i128::from(DURATION)));
     assert_eq!(g.vested_amount(START + 500), Ok(TOTAL / 2));
 }
 
@@ -330,20 +330,26 @@ fn schedule_lists_start_cliff_and_end_for_a_cliffed_grant() {
     let f = Fixture::new(true);
     assert_eq!(
         checkpoints(&f),
-        vec![(START, 0), (START + 100, 100_000), (START + 1_000, TOTAL)]
+        std::vec![(START, 0), (START + 100, 100_000), (START + 1_000, TOTAL)]
     );
 }
 
 #[test]
 fn schedule_with_no_cliff_is_start_and_end() {
     let f = Fixture::with_schedule(true, 0, DURATION);
-    assert_eq!(checkpoints(&f), vec![(START, 0), (START + DURATION, TOTAL)]);
+    assert_eq!(
+        checkpoints(&f),
+        std::vec![(START, 0), (START + DURATION, TOTAL)]
+    );
 }
 
 #[test]
 fn schedule_with_cliff_equal_to_duration_is_start_and_end() {
     let f = Fixture::with_schedule(true, DURATION, DURATION);
-    assert_eq!(checkpoints(&f), vec![(START, 0), (START + DURATION, TOTAL)]);
+    assert_eq!(
+        checkpoints(&f),
+        std::vec![(START, 0), (START + DURATION, TOTAL)]
+    );
 }
 
 #[test]
@@ -644,11 +650,7 @@ fn create_reverts_cleanly_when_grantor_cannot_fund() {
     let (token_client, grantor) = te.make_token(1);
     let token = token_client.address.clone();
     let beneficiary = te.make_address();
- test/consolidate-contract-helpers-and-stable-ids
     let env = te.env().clone();
-
-    let env = te.env.clone();
- main
     let c = VestingContractClient::new(&env, &env.register(VestingContract, ()));
 
     assert!(c
@@ -677,11 +679,7 @@ fn create_emits_the_created_event() {
     let (token_client, grantor) = te.make_token(MINT);
     let token_address = token_client.address.clone();
     let beneficiary = te.make_address();
- test/consolidate-contract-helpers-and-stable-ids
     let env = te.env().clone();
-
-    let env = te.env.clone();
- main
 
     let client = VestingContractClient::new(&env, &env.register(VestingContract, ()));
     client.create(

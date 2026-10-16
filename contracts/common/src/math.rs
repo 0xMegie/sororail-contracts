@@ -174,6 +174,10 @@ mod remaining_count_tests {
 
 #[cfg(test)]
 mod tests {
+    // This seeded property-test generator intentionally uses wrapping,
+    // truncating PRNG arithmetic; contract arithmetic remains checked above.
+    #![allow(clippy::arithmetic_side_effects)]
+
     use super::*;
 
     /// A small xorshift PRNG. `rand`/`proptest` aren't workspace dependencies
@@ -193,12 +197,20 @@ mod tests {
 
         /// Uniform in `[lo, hi]`.
         fn next_i128_in(&mut self, lo: i128, hi: i128) -> i128 {
-            let span = (hi - lo + 1) as u128;
-            lo + (self.next_u64() as u128 % span) as i128
+            let span = hi
+                .checked_sub(lo)
+                .and_then(|difference| difference.checked_add(1))
+                .and_then(|difference| u128::try_from(difference).ok())
+                .expect("range should be positive and fit in u128");
+            let offset = i128::try_from(u128::from(self.next_u64()) % span)
+                .expect("offset should fit in i128");
+            lo.checked_add(offset)
+                .expect("generated value should remain within the requested range")
         }
 
         fn next_bps(&mut self) -> u32 {
-            (self.next_u64() % (MAX_BPS as u64 + 1)) as u32
+            u32::try_from(self.next_u64() % u64::from(MAX_BPS).saturating_add(1))
+                .expect("generated value should not exceed MAX_BPS")
         }
     }
 

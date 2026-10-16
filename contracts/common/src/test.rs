@@ -86,7 +86,10 @@ fn mul_bps_at_full_bps_returns_the_whole_amount() {
     // rounding loss, regardless of whether the amount divides evenly.
     assert_eq!(math::mul_bps(1, MAX_BPS), Ok(1));
     assert_eq!(math::mul_bps(9_999, MAX_BPS), Ok(9_999));
-    assert_eq!(math::mul_bps(i128::MAX / 10_000, MAX_BPS), Ok(i128::MAX / 10_000));
+    assert_eq!(
+        math::mul_bps(i128::MAX / 10_000, MAX_BPS),
+        Ok(i128::MAX / 10_000)
+    );
 }
 
 #[test]
@@ -313,8 +316,14 @@ fn require_reports_the_given_error() {
 #[test]
 fn require_with_false_condition_errors_with_the_given_variant() {
     // The error returned must be whatever the caller passed, not a fixed one.
-    assert_eq!(auth::require(false, Error::InvalidAmount), Err(Error::InvalidAmount));
-    assert_eq!(auth::require(false, Error::EscrowClosed), Err(Error::EscrowClosed));
+    assert_eq!(
+        auth::require(false, Error::InvalidAmount),
+        Err(Error::InvalidAmount)
+    );
+    assert_eq!(
+        auth::require(false, Error::EscrowClosed),
+        Err(Error::EscrowClosed)
+    );
 }
 
 #[test]

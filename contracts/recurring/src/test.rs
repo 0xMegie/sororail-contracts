@@ -194,7 +194,7 @@ fn authorize_rejects_multiple_invalid_args_in_order() {
     let f = Fixture::new(None);
 
     // InvalidAmount comes before InvalidDuration
-    let env = f.client.client.env.clone();
+    let env = f.env.clone();
     let contract_id = env.register(RecurringContract, ());
     let client = RecurringContractClient::new(&env, &contract_id);
     assert_eq!(
@@ -217,16 +217,8 @@ fn authorize_rejects_multiple_invalid_args_in_order() {
         Err(Ok(Error::InvalidDuration))
     );
 
-    // Validation completes before AlreadyInitialized check
-    // AlreadyInitialized comes before amount validation on second call
-    f.client.authorize(
-        &f.payer,
-        &f.payee,
-        &f.token.address,
-        &AMOUNT,
-        &PERIOD,
-        &None,
-    );
+    // The fixture is already initialized. AlreadyInitialized comes before
+    // amount validation on a second call.
     assert_eq!(
         f.client
             .try_authorize(&f.payer, &f.payee, &f.token.address, &0, &PERIOD, &None),
@@ -504,7 +496,7 @@ fn charge_reverts_schedule_state_when_allowance_is_expired() {
     // Advance the ledger past the allowance expiry.
     f.env
         .ledger()
-        .with_mut(|l| l.sequence = current_seq + 100_000);
+        .with_mut(|l| l.sequence_number = current_seq + 100_000);
 
     f.at(START + PERIOD);
     assert!(f.client.try_charge().is_err());

@@ -85,6 +85,10 @@ fn execute_pays_each_recipient_their_own_amount() {
     ];
 
     let receipt = f.client.execute(&f.funder, &f.token.address, &batch);
+    // Capture immediately: subsequent token balance invocations replace the
+    // events returned by `events().all()`.
+    let all = f.env.events().all();
+    let events = all.events();
     assert_eq!(
         receipt,
         Receipt {
@@ -101,8 +105,6 @@ fn execute_pays_each_recipient_their_own_amount() {
 
     // `execute` emits one token transfer per recipient before its own
     // `Executed`, so take the last event rather than assuming an index.
-    let all = f.env.events().all();
-    let events = all.events();
     let executed_event = events.last().expect("no events emitted");
     let expected = Executed {
         funder: f.funder.clone(),
@@ -531,7 +533,7 @@ fn preview_returns_the_correct_receipt_and_moves_nothing() {
     assert_eq!(f.token.balance(&f.funder), MINT);
     assert_eq!(f.token.balance(&f.client.address), 0);
     // Unlike `execute`, `preview` never publishes an `Executed` event.
-    assert!(f.env.events().all().is_empty());
+    assert!(f.env.events().all().events().is_empty());
 }
 
 #[test]
@@ -572,7 +574,7 @@ fn a_full_size_batch_executes() {
         .client
         .execute_equal(&f.funder, &f.token.address, &recipients, &10);
     assert_eq!(receipt.count, MAX_RECIPIENTS);
-    assert_eq!(receipt.total, 10 * MAX_RECIPIENTS as i128);
+    assert_eq!(receipt.total, 10 * i128::from(MAX_RECIPIENTS));
 }
 
 /// Largest batch that executes under the test environment's budget.
