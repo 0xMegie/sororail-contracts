@@ -58,7 +58,7 @@ impl BatchPayoutContract {
 
     /// Pays every recipient the same amount, in one transaction.
     ///
-    /// The common payroll shape, and cheaper to submit than [`Self::execute`]
+    /// The common payroll shape, and cheaper to submit than `execute`
     /// because the amount crosses the wire once rather than once per line.
     pub fn execute_equal(
         env: Env,
@@ -108,7 +108,7 @@ impl BatchPayoutContract {
 
     /// Totals a batch without moving anything, for a pre-signature preview.
     ///
-    /// Runs exactly the validation [`Self::execute`] does, so a preview that
+    /// Runs exactly the validation `execute` does, so a preview that
     /// succeeds means the batch itself will not be rejected for size, an
     /// invalid amount, or an overflowing total.
     pub fn preview(env: Env, recipients: Vec<Payment>) -> Result<Receipt, Error> {
