@@ -4,15 +4,19 @@
 
 use soroban_sdk::{
     map,
-    testutils::{storage::Instance as _, Address as _, Events as _, Ledger as _},
+    testutils::{
+        storage::Instance as _, Address as _, Events as _, Ledger as _, MockAuth, MockAuthInvoke,
+    },
     token::{StellarAssetClient, TokenClient},
-    vec, Address, Env, Event, IntoVal, Symbol, Val,
+    vec,
+    xdr::{ScErrorCode, ScErrorType},
+    Address, Env, Event, IntoVal, Symbol, Val,
 };
 use sororail_common::{storage::INSTANCE_BUMP, testutils::TestEnv, Error};
 
 use crate::{
     contract::{StreamContract, StreamContractClient},
-    events::{Cancelled, Created, Withdrawn},
+    events::{Cancelled, Created, ToppedUp, Withdrawn},
     types::Stream,
 };
 
@@ -682,6 +686,65 @@ fn cancel_rejects_a_second_call() {
     assert_eq!(f.client.try_cancel(), Err(Ok(Error::StreamCancelled)));
 }
 
+/// Only the sender may cancel: a caller authorizing as anyone else hits the
+/// host's auth check, not a contract error, and the stream is left intact.
+#[test]
+fn cancel_is_rejected_for_a_non_sender_caller() {
+    let f = Fixture::new(true);
+    f.at(START + 400);
+    let held = f.held();
+    let sender_balance = f.token.balance(&f.sender);
+    let recipient_balance = f.token.balance(&f.recipient);
+
+    for caller in [&f.outsider, &f.recipient] {
+        f.env.mock_auths(&[MockAuth {
+            address: caller,
+            invoke: &MockAuthInvoke {
+                contract: &f.client.address,
+                fn_name: "cancel",
+                args: ().into_val(&f.env),
+                sub_invokes: &[],
+            },
+        }]);
+        let res = f.env.try_invoke_contract::<(), soroban_sdk::Error>(
+            &f.client.address,
+            &Symbol::new(&f.env, "cancel"),
+            vec![&f.env],
+        );
+        assert_eq!(
+            res,
+            Err(Ok(soroban_sdk::Error::from_type_and_code(
+                ScErrorType::Auth,
+                ScErrorCode::InvalidAction,
+            )))
+        );
+    }
+
+    assert_eq!(f.client.get().cancelled_at, None);
+    assert_eq!(f.held(), held);
+    assert_eq!(f.token.balance(&f.sender), sender_balance);
+    assert_eq!(f.token.balance(&f.recipient), recipient_balance);
+}
+
+#[test]
+fn second_cancel_errors_without_moving_tokens() {
+    let f = Fixture::new(true);
+    f.at(START + 400);
+    f.client.cancel();
+    let after_first = f.client.get();
+    let held = f.held();
+    let sender_balance = f.token.balance(&f.sender);
+    let recipient_balance = f.token.balance(&f.recipient);
+
+    f.at(START + 800);
+    assert_eq!(f.client.try_cancel(), Err(Ok(Error::StreamCancelled)));
+
+    assert_eq!(f.client.get(), after_first);
+    assert_eq!(f.held(), held);
+    assert_eq!(f.token.balance(&f.sender), sender_balance);
+    assert_eq!(f.token.balance(&f.recipient), recipient_balance);
+}
+
 #[test]
 fn cancel_after_stop_refunds_nothing_and_settles_everything() {
     let f = Fixture::new(true);
@@ -778,6 +841,29 @@ fn top_up_emits_the_topped_up_event() {
     );
 }
 
+/// Across repeated top-ups the event carries only the amount just added,
+/// while `deposited` and `new_stop` report the cumulative totals.
+#[test]
+fn top_up_event_carries_the_added_amount_and_the_new_total() {
+    let f = Fixture::new(true);
+    f.client.top_up(&(RATE * 500));
+    f.client.top_up(&(RATE * 250));
+
+    // `top_up` emits the token's transfer event before its own `ToppedUp`,
+    // so take the last event rather than assuming an index.
+    let all = f.env.events().all();
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
+    let expected = ToppedUp {
+        sender: f.sender.clone(),
+        amount: RATE * 250,
+        new_stop: STOP + 750,
+        deposited: DEPOSITED + RATE * 750,
+    };
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
+    assert_eq!(f.client.get().deposited, DEPOSITED + RATE * 750);
+}
+
 #[test]
 fn top_up_rejects_an_amount_that_is_not_a_whole_number_of_seconds() {
     let f = Fixture::new(true);
@@ -829,6 +915,25 @@ fn top_up_is_rejected_after_cancellation() {
         f.client.try_top_up(&(RATE * 10)),
         Err(Ok(Error::StreamCancelled))
     );
+}
+
+#[test]
+fn top_up_after_cancellation_moves_no_tokens_and_leaves_the_stream_unchanged() {
+    let f = Fixture::new(true);
+    f.at(START + 400);
+    f.client.cancel();
+    let before = f.client.get();
+    let held = f.held();
+    let sender_balance = f.token.balance(&f.sender);
+
+    assert_eq!(
+        f.client.try_top_up(&(RATE * 100)),
+        Err(Ok(Error::StreamCancelled))
+    );
+
+    assert_eq!(f.client.get(), before);
+    assert_eq!(f.held(), held);
+    assert_eq!(f.token.balance(&f.sender), sender_balance);
 }
 
 // ----------------------------------------------------------------- extend
