@@ -130,47 +130,1041 @@ fn nothing_accrues_before_start() {
 }
 
 #[test]
-fn accrual_is_linear_between_start_and]uóm­¢G§²ÚîÆ­yÜÍµ…±±•ÍÐÕ¹¥Ð€¡”¹œ¸°ÍÑÉ½½ÁÌ(€€€€¼¼¼™½Èa14°½ÈÑ¡”‰…Í”Õ¹¥Ð‘•™¥¹•‰äÑ¡”Ñ½­•¸Ì‘•¥µ…±Ì¤¸(€€€ÁÕˆÉ…Ñ•}Á•É}Í•½¹è¤ÄÈà°(€€€€¼¼¼1•‘•ÈÑ¥µ•ÍÑ…µÀ…ÐÝ¡¥ …ÉÕ…°‰•¥¹Ì°¥¸Í•½¹‘ÌÍ¥¹”Ñ¡”U¹¥à(€€€€¼¼¼•Á½ ¸(€€€ÁÕˆÍÑ…ÉÐèÔØÐ°(€€€€¼¼¼1•‘•ÈÑ¥µ•ÍÑ…µÀ…ÐÝ¡¥ …ÉÕ…°•¹‘Ì°¥¸Í•½¹‘ÌÍ¥¹”Ñ¡”U¹¥à(€€€€¼¼¼•Á½ ¸(€€€ÁÕˆÍÑ½ÀèÔØÐ°(€€€€¼¼¼]¡•Ñ¡•ÈÑ¡”Í•¹‘•Èµ…ä…¹•°‰•™½É”ÍÑ½Á€¸(€€€ÁÕˆ…¹•±±…‰±”è‰½½°°(€€€€¼¼¼Q½Ñ…°•Ù•ÈÁÕ±±•™É½´Ñ¡”Í•¹‘•È°¥¸Ñ¡”Ñ½­•¸ÌÍµ…±±•ÍÐÕ¹¥Ð¸±Ý…åÌ(€€€€¼¼¼É…Ñ•}Á•É}Í•½¹€¨€¡ÍÑ½À€´ÍÑ…ÉÐ¥€¸(€€€ÁÕˆ‘•Á½Í¥Ñ•è¤ÄÈà°(€€€€¼¼¼Q½Ñ…°•Ù•ÈÁ…¥½ÕÐÑ¼Ñ¡”É•¥Á¥•¹Ð°¥¸Ñ¡”Ñ½­•¸ÌÍµ…±±•ÍÐÕ¹¥Ð¸(€€€ÁÕˆÝ¥Ñ¡‘É…Ý¸è¤ÄÈà°(€€€€¼¼¼Q½Ñ…°•Ù•ÈÉ•ÑÕÉ¹•Ñ¼Ñ¡”Í•¹‘•È½¸…¹•±±…Ñ¥½¸°¥¸Ñ¡”Ñ½­•¸Ì(€€€€¼¼¼Íµ…±±•ÍÐÕ¹¥Ð¸(€€€ÁÕˆÉ•™Õ¹‘•è¤ÄÈà°(€€€€¼¼¼]¡•¸Ñ¡”ÍÑÉ•…´Ý…Ì…¹•±±•°¥˜¥ÐÝ…Ì°¥¸Í•½¹‘ÌÍ¥¹”Ñ¡”U¹¥à(€€€€¼¼¼•Á½ ¸ÉÕ…°ÍÑ½ÁÌ¡•É”¸(€€€ÁÕˆ…¹•±±•‘}…Ðè=ÁÑ¥½¸ñÔØÐø°)ô()¥µÁ°MÑÉ•…´ì(€€€€¼¼¼Q½Ñ…°…ÉÕ•Ñ¼Ñ¡”É•¥Á¥•¹Ð…Ì½˜…Ñ€°Ý¡•Ñ¡•ÈÝ¥Ñ¡‘É…Ý¸½È¹½Ð¸(€€€€¼¼¼(€€€€¼¼¼AÕÉ”è¹¼ÍÑ½É…”°¹¼•¹Ù¥É½¹µ•¹Ð¸±…µÁ•…Ð‰½Ñ •¹‘Ì€´´¹½Ñ¡¥¹œ(€€€€¼¼¼…ÉÕ•Ì‰•™½É”ÍÑ…ÉÑ€°…¹…ÉÕ…°¡…±ÑÌ…ÐÍÑ½Á€½È…ÐÑ¡”(€€€€¼¼¼…¹•±±…Ñ¥½¸Ñ¥µ•ÍÑ…µÀ°Ý¡¥¡•Ù•È½µ•Ì™¥ÉÍÐ¸Q¡”É•ÍÕ±Ð…¸¹•Ù•È(€€€€¼¼¼•á••‘•Á½Í¥Ñ•‘€¸(€€€ÁÕˆ™¸…ÉÕ•‘}…Ð ™Í•±˜°…ÐèÔØÐ¤€´øI•ÍÕ±Ðñ¤ÄÈà°ÉÉ½Èøì(€€€€€€€±•ÐµÕÐ•™™•Ñ¥Ù”€ô…Ðì(€€€€€€€¥˜±•ÐM½µ”¡…¹•±±•¤€ôÍ•±˜¹…¹•±±•‘}…Ðì(€€€€€€€€€€€•™™•Ñ¥Ù”€ô•™™•Ñ¥Ù”¹µ¥¸¡…¹•±±•¤ì(€€€€€€€ô(€€€€€€€•™™•Ñ¥Ù”€ô•™™•Ñ¥Ù”¹µ¥¸¡Í•±˜¹ÍÑ½À¤ì((€€€€€€€¥˜•™™•Ñ¥Ù”€ðôÍ•±˜¹ÍÑ…ÉÐì(€€€€€€€€€€€É•ÑÕÉ¸=¬ À¤ì(€€€€€€€ô(€€€€€€€±•Ð•±…ÁÍ•€ôµ…Ñ èéÍÕˆ¡¤ÄÈàèé™É½´¡•™™•Ñ¥Ù”¤°¤ÄÈàèé™É½´¡Í•±˜¹ÍÑ…ÉÐ¤¤üì(€€€€€€€±•Ð…ÉÕ•€ôµ…Ñ èéµÕ°¡Í•±˜¹É…Ñ•}Á•É}Í•½¹°•±…ÁÍ•¤üì(€€€€€€€=¬¡µ…Ñ èéµ¥¸¡…ÉÕ•°Í•±˜¹‘•Á½Í¥Ñ•¤¤(€€€ô((€€€€¼¼¼ÉÕ•‰ÕÐ¹½Ðå•ÐÝ¥Ñ¡‘É…Ý¸°…Ì½˜…Ñ€¸]¡…ÐÑ¡”É•¥Á¥•¹Ð…¸Ñ…­”¸(€€€ÁÕˆ™¸…Ù…¥±…‰±•}…Ð ™Í•±˜°…ÐèÔØÐ¤€´øI•ÍÕ±Ðñ¤ÄÈà°ÉÉ½Èøì(€€€€€€€±•Ð…ÉÕ•€ôÍ•±˜¹…ÉÕ•‘}…Ð¡…Ð¤üì(€€€€€€€¥˜Í•±˜¹Ý¥Ñ¡‘É…Ý¸€ø…ÉÕ•ì(€€€€€€€€€€€É•ÑÕÉ¸ÉÈ¡ÉÉ½ÈèéU¹‘•É™±½Ü¤ì(€€€€€€€ô(€€€€€€€µ…Ñ èéÍÕˆ¡…ÉÕ•°Í•±˜¹Ý¥Ñ¡‘É…Ý¸¤(€€€ô((€€€€¼¼¼]¡…ÐÑ¡”½¹ÑÉ…ÐÍÑ¥±°¡½±‘Ì™½ÈÑ¡¥ÌÍÑÉ•…´¸(€€€ÁÕˆ™¸É•µ…¥¹¥¹œ ™Í•±˜¤€´øI•ÍÕ±Ðñ¤ÄÈà°ÉÉ½Èøì(€€€€€€€µ…Ñ èéÍÕˆ¡µ…Ñ èéÍÕˆ¡Í•±˜¹‘•Á½Í¥Ñ•°Í•±˜¹Ý¥Ñ¡‘É…Ý¸¤ü°Í•±˜¹É•™Õ¹‘•¤(€€€ô((€€€€¼¼¼]¡•Ñ¡•ÈÑ¡”ÍÑÉ•…´¡…Ì‰••¸…¹•±±•¸(€€€€¼¼¼(€€€€¼¼¼Q¡”±¥™•å±”¥Ì‰¥¹…Éä…¹½¹”µÝ…ä°Í¼¥Ð¥Ìµ½‘•±±•‰äÑ¡”(€€€€¼¼¼…¹•±±•‘}…Ñ€Ñ¥µ•ÍÑ…µÀ€¡Ý¡¥ …ÉÕ…°¹••‘Ì…¹åÝ…ä¤É…Ñ¡•ÈÑ¡…¸„(€€€€¼¼¼MÑ…Ñ•€•¹Õ´±¥­”•ÍÉ½ÜÌ¸M•”€‰1¥™•å±”µ½‘•±¥¹œˆ¥¸MA¹µ¸(€€€ÁÕˆ™¸¥Í}…¹•±±• ™Í•±˜¤€´ø‰½½°ì(€€€€€€€Í•±˜¹…¹•±±•‘}…Ð¹¥Í}Í½µ” ¤(€€€ô((€€€€¼¼¼Q¡”‘•±…É•ÍÁ…¸¥¸Í•½¹‘Ì¸(€€€ÁÕˆ™¸‘ÕÉ…Ñ¥½¸ ™Í•±˜¤€´øÔØÐì(€€€€€€€Í•±˜¹ÍÑ½À¹Í…ÑÕÉ…Ñ¥¹}ÍÕˆ¡Í•±˜¹ÍÑ…ÉÐ¤(€€€ô)ô(
-// ------------------------------------------------ issues #244-#247
-
-#[test]
-fn balance_of_an_unrelated_address_is_zero() {
-    let f = Fixture::new(true);
-    assert_eq!(f.client.balance_of(&f.outsider), 0);
-    f.at(START + DURATION / 2);
-    assert_eq!(f.client.balance_of(&f.outsider), 0);
-    f.at(STOP);
-    assert_eq!(f.client.try_balance_of(&f.outsider), Ok(Ok(0)));
+ test/issues-296-299-lifecycle-properties
+fn accrual_is_linear_between_start_and_stop() {
+    let env = Env::default();
+    let s = bare(&env);
+    assert_eq!(s.accrued_at(START + 1), Ok(RATE));
+    assert_eq!(s.accrued_at(START + 250), Ok(RATE * 250));
+    assert_eq!(s.accrued_at(START + DURATION / 2), Ok(DEPOSITED / 2));
 }
 
 #[test]
-fn remaining_is_zero_after_full_withdrawal() {
-    let f = Fixture::new(false);
-    f.at(STOP);
+fn accrual_is_capped_at_stop() {
+    let env = Env::default();
+    let s = bare(&env);
+    assert_eq!(s.accrued_at(STOP), Ok(DEPOSITED));
+    assert_eq!(s.accrued_at(STOP + 1), Ok(DEPOSITED));
+    assert_eq!(s.accrued_at(u64::MAX), Ok(DEPOSITED));
+}
+
+#[test]
+fn accrual_halts_at_cancellation() {
+    let env = Env::default();
+    let mut s = bare(&env);
+    s.cancelled_at = Some(START + 100);
+    assert_eq!(s.accrued_at(START + 100), Ok(RATE * 100));
+    // Time moving on does not accrue any more.
+    assert_eq!(s.accrued_at(START + 500), Ok(RATE * 100));
+    assert_eq!(s.accrued_at(STOP + 5_000), Ok(RATE * 100));
+}
+
+#[test]
+fn a_one_second_stream_accrues_exactly_one_tick() {
+    let env = Env::default();
+    let mut s = bare(&env);
+    s.stop = START + 1;
+    s.deposited = RATE;
+    assert_eq!(s.accrued_at(START), Ok(0));
+    assert_eq!(s.accrued_at(START + 1), Ok(RATE));
+    assert_eq!(s.accrued_at(START + 2), Ok(RATE));
+}
+
+#[test]
+fn accrual_reports_overflow_rather_than_wrapping() {
+    let env = Env::default();
+    let mut s = bare(&env);
+    s.rate_per_second = i128::MAX;
+    s.deposited = i128::MAX;
+    assert_eq!(s.accrued_at(START + 2), Err(Error::Overflow));
+}
+
+#[test]
+fn accrual_is_exact_at_a_rate_and_elapsed_that_divide_badly() {
+    // Unlike vesting's `total * elapsed / duration`, accrual never divides,
+    // so there is no rounding direction to get wrong: it is always exactly
+    // `rate * elapsed`, even for a rate/elapsed pair that would leave a
+    // remainder under any proportional (divide-then-multiply) formulation.
+    let env = Env::default();
+    let mut s = bare(&env);
+    s.rate_per_second = 7; // prime; divides unevenly into most spans
+    s.stop = START + 3; // an odd, non-multiple-of-7 span
+    s.deposited = 7 * 3;
+
+    assert_eq!(s.accrued_at(START + 1), Ok(7));
+    assert_eq!(s.accrued_at(START + 2), Ok(14));
+    assert_eq!(s.accrued_at(START + 3), Ok(21));
+    // Capped at `stop`, not truncated to some lower rounded figure.
+    assert_eq!(s.accrued_at(START + 3), Ok(s.deposited));
+}
+
+/// Documents that `available_at` degrades to `Err(Underflow)` if `withdrawn`
+/// ever exceeds accrued (e.g. a future code path bug). Today's `withdraw`
+/// rejects `requested > available`, so this state is unreachable through the
+/// contract entry points; the pure helper must still not wrap to a negative
+/// `i128` if it is reached.
+#[test]
+fn available_at_errors_if_withdrawn_exceeds_accrued() {
+    let env = Env::default();
+    let mut s = bare(&env);
+    // Accrued at START+10 is RATE*10; force withdrawn past that.
+    s.withdrawn = RATE * 10 + 1;
+    assert_eq!(
+        s.available_at(START + 10),
+        Err(Error::Underflow),
+        "available_at must error rather than wrap when withdrawn > accrued"
+    );
+    // Even after full accrual, an over-withdrawn book still errors.
+    s.withdrawn = DEPOSITED + 1;
+    assert_eq!(s.available_at(STOP), Err(Error::Underflow));
+}
+
+// ------------------------------------------------------------------ create
+
+#[test]
+fn create_funds_the_whole_span_up_front() {
+    let f = Fixture::new(true);
+    assert_eq!(f.held(), DEPOSITED);
+    assert_eq!(f.token.balance(&f.sender), MINT - DEPOSITED);
+    let s = f.client.get();
+    assert_eq!(s.deposited, DEPOSITED);
+    assert_eq!(s.withdrawn, 0);
+    assert_eq!(s.refunded, 0);
+    assert_eq!(s.cancelled_at, None);
+    f.assert_conserved();
+}
+
+/// Pins Created topics and data fields (SPEC.md `indexed_events`).
+#[test]
+fn create_emits_the_created_event() {
+    let f = Fixture::new(true);
+    // `create` emits the token's own transfer event before its own
+    // `Created`, so take the last event rather than assuming an index.
+    let all = f.env.events().all();
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
+    let expected = Created {
+        sender: f.sender.clone(),
+        recipient: f.recipient.clone(),
+        token: f.token.address.clone(),
+        rate_per_second: RATE,
+        start: START,
+        stop: STOP,
+        cancellable: true,
+        deposited: DEPOSITED,
+    };
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
+}
+
+#[test]
+fn create_rejects_a_non_positive_rate() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|l| l.timestamp = START);
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    let (a, b, t) = (
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+    );
+    for bad in [0i128, -1, i128::MIN] {
+        assert_eq!(
+            c.try_create(&a, &b, &t, &bad, &START, &STOP, &true),
+            Err(Ok(Error::InvalidAmount)),
+            "rate {bad} was accepted"
+        );
+    }
+}
+
+#[test]
+fn create_rejects_an_empty_or_inverted_span() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|l| l.timestamp = START);
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    let (a, b, t) = (
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+    );
+    for bad_stop in [START, START - 1, 0] {
+        assert_eq!(
+            c.try_create(&a, &b, &t, &RATE, &START, &bad_stop, &true),
+            Err(Ok(Error::InvalidTimeRange)),
+            "stop {bad_stop} was accepted"
+        );
+    }
+}
+
+#[test]
+fn create_rejects_funding_that_overflows() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|l| l.timestamp = START);
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    let (a, b, t) = (
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+    );
+    assert_eq!(
+        c.try_create(&a, &b, &t, &i128::MAX, &START, &(START + 2), &true),
+        Err(Ok(Error::Overflow))
+    );
+}
+
+#[test]
+fn create_allows_the_exact_max_funding_boundary() {
+    // `rate_per_second * (stop - start) == i128::MAX` is the largest a stream
+    // can be funded: it must succeed. `i128::MAX` is prime (Mersenne prime
+    // M127), so the only single-second-span way to land exactly on it is
+    // `rate = i128::MAX`, `duration = 1`; one more second overflows (asserted
+    // just above, in `create_rejects_funding_that_overflows`).
+    let te = TestEnv::at(START);
+    let (token_client, sender) = te.make_token(i128::MAX);
+    let token = token_client.address.clone();
+    let recipient = te.make_address();
+    let env = te.env().clone();
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+
+    c.create(
+        &sender,
+        &recipient,
+        &token,
+        &i128::MAX,
+        &START,
+        &(START + 1),
+        &true,
+    );
+
+    let s = c.get();
+    assert_eq!(s.rate_per_second, i128::MAX);
+    assert_eq!(s.stop - s.start, 1);
+    assert_eq!(s.deposited, i128::MAX);
+    assert_eq!(s.withdrawn, 0);
+    assert_eq!(c.remaining(), i128::MAX);
+    assert_eq!(token_client.balance(&c.address), i128::MAX);
+    assert_eq!(token_client.balance(&sender), 0);
+}
+
+#[test]
+fn create_rejects_a_second_call() {
+    let f = Fixture::new(true);
+    assert_eq!(
+        f.client.try_create(
+            &f.sender,
+            &f.recipient,
+            &f.token.address,
+            &RATE,
+            &START,
+            &STOP,
+            &true
+        ),
+        Err(Ok(Error::AlreadyInitialized))
+    );
+}
+
+#[test]
+fn create_rejects_identical_sender_and_recipient() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|l| l.timestamp = START);
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    let party = Address::generate(&env);
+    let token = Address::generate(&env);
+    assert_eq!(
+        c.try_create(&party, &party, &token, &RATE, &START, &STOP, &true),
+        Err(Ok(Error::IdenticalParties))
+    );
+}
+
+/// A self-stream is refused before any funds move, and leaves no stream behind.
+#[test]
+fn self_stream_is_refused_without_moving_funds() {
+    let te = TestEnv::at(START);
+    let (token, sender) = te.make_token(MINT);
+    let env = te.env().clone();
+    let client = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    assert_eq!(
+        client.try_create(
+            &sender,
+            &sender,
+            &token.address,
+            &RATE,
+            &START,
+            &STOP,
+            &true
+        ),
+        Err(Ok(Error::IdenticalParties))
+    );
+    assert_eq!(token.balance(&sender), MINT);
+    assert_eq!(token.balance(&client.address), 0);
+    assert_eq!(client.try_get(), Err(Ok(Error::NotInitialized)));
+}
+
+/// `create` saves the stream before pulling funds. If the token transfer
+/// fails, the host reverts the whole invocation éˆ¥ï¿½ including that save éˆ¥ï¿½ so a
+/// later `get` still sees `NotInitialized`.
+#[test]
+fn create_reverts_cleanly_when_sender_cannot_fund() {
+    let te = TestEnv::at(START);
+    // Mint far less than the deposit the span requires.
+    let (token_client, sender) = te.make_token(RATE);
+    let token = token_client.address.clone();
+    let recipient = te.make_address();
+    let env = te.env().clone();
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+
+    assert!(c
+        .try_create(&sender, &recipient, &token, &RATE, &START, &STOP, &true)
+        .is_err());
+    assert_eq!(c.try_get(), Err(Ok(Error::NotInitialized)));
+    assert_eq!(token_client.balance(&c.address), 0);
+    assert_eq!(token_client.balance(&sender), RATE);
+}
+#[test]
+fn entry_points_error_before_create() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    let who = Address::generate(&env);
+    assert_eq!(c.try_withdraw(&None), Err(Ok(Error::NotInitialized)));
+    assert_eq!(c.try_cancel(), Err(Ok(Error::NotInitialized)));
+    assert_eq!(c.try_top_up(&RATE), Err(Ok(Error::NotInitialized)));
+    assert_eq!(c.try_extend(&STOP), Err(Ok(Error::NotInitialized)));
+    assert_eq!(c.try_balance_of(&who), Err(Ok(Error::NotInitialized)));
+    assert_eq!(c.try_remaining(), Err(Ok(Error::NotInitialized)));
+}
+
+#[test]
+fn create_with_contract_as_recipient_succeeds() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|l| l.timestamp = START);
+    let sender = Address::generate(&env);
+    let issuer = Address::generate(&env);
+    let token = env.register_stellar_asset_contract_v2(issuer).address();
+    let contract_id = env.register(StreamContract, ());
+    let client = StreamContractClient::new(&env, &contract_id);
+
+    StellarAssetClient::new(&env, &token).mint(&sender, &(RATE * 1000));
+
+    let result = client.try_create(&sender, &contract_id, &token, &RATE, &START, &STOP, &true);
+    assert!(
+        result.is_ok(),
+        "create with contract as recipient should succeed"
+    );
+}
+
+#[test]
+fn create_rejects_multiple_invalid_args_in_order() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|l| l.timestamp = START);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let issuer = Address::generate(&env);
+    let token = env.register_stellar_asset_contract_v2(issuer).address();
+    let funding = RATE * i128::from(STOP - START);
+    StellarAssetClient::new(&env, &token).mint(&sender, &funding);
+    let contract_id = env.register(StreamContract, ());
+    let client = StreamContractClient::new(&env, &contract_id);
+
+    // AlreadyInitialized comes before InvalidTimeRange
+    client.create(&sender, &recipient, &token, &RATE, &START, &STOP, &true);
+    assert_eq!(
+        client.try_create(&sender, &recipient, &token, &RATE, &START, &START, &true),
+        Err(Ok(Error::AlreadyInitialized))
+    );
+
+    // IdenticalParties check comes before rate validation
+    let contract_id2 = env.register(StreamContract, ());
+    let client2 = StreamContractClient::new(&env, &contract_id2);
+    assert_eq!(
+        client2.try_create(&sender, &sender, &token, &0, &START, &STOP, &true),
+        Err(Ok(Error::IdenticalParties))
+    );
+
+    // InvalidTimeRange check comes before overflow check
+    let contract_id3 = env.register(StreamContract, ());
+    let client3 = StreamContractClient::new(&env, &contract_id3);
+    assert_eq!(
+        client3.try_create(&sender, &recipient, &token, &RATE, &STOP, &START, &true),
+        Err(Ok(Error::InvalidTimeRange))
+    );
+}
+
+#[test]
+#[should_panic]
+fn create_requires_the_senders_authorization() {
+    let env = Env::default();
+    env.ledger().with_mut(|l| l.timestamp = START);
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    c.create(
+        &Address::generate(&env),
+        &Address::generate(&env),
+        &Address::generate(&env),
+        &RATE,
+        &START,
+        &STOP,
+        &true,
+    );
+}
+
+// ---------------------------------------------------------------- withdraw
+
+#[test]
+fn withdraw_none_takes_everything_available() {
+    let f = Fixture::new(true);
+    f.at(START + 300);
+    assert_eq!(f.client.withdraw(&None), RATE * 300);
+    assert_eq!(f.token.balance(&f.recipient), RATE * 300);
+    f.assert_conserved();
+}
+
+#[test]
+fn withdraw_emits_the_withdrawn_event() {
+    let f = Fixture::new(true);
+    f.at(START + 300);
+    f.client.withdraw(&None);
+
+    // `withdraw` emits the token's own transfer event before its own
+    // `Withdrawn`, so take the last event rather than assuming an index.
+    let all = f.env.events().all();
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
+    let expected = Withdrawn {
+        recipient: f.recipient.clone(),
+        amount: RATE * 300,
+        total_withdrawn: RATE * 300,
+    };
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
+}
+
+#[test]
+fn withdraw_takes_a_partial_amount() {
+    let f = Fixture::new(true);
+    f.at(START + 300);
+    assert_eq!(f.client.withdraw(&Some(RATE * 100)), RATE * 100);
+    assert_eq!(f.client.balance_of(&f.recipient), RATE * 200);
+    f.assert_conserved();
+}
+
+#[test]
+fn withdraw_rejects_more_than_has_accrued() {
+    let f = Fixture::new(true);
+    f.at(START + 300);
+    assert_eq!(
+        f.client.try_withdraw(&Some(RATE * 301)),
+        Err(Ok(Error::StreamInsufficientAccrued))
+    );
+    assert_eq!(f.held(), DEPOSITED);
+}
+
+#[test]
+fn withdraw_rejects_when_nothing_has_accrued() {
+    let f = Fixture::new(true);
+    // Still at `start`; nothing accrued.
+    assert_eq!(f.client.try_withdraw(&None), Err(Ok(Error::InvalidAmount)));
+    assert_eq!(
+        f.client.try_withdraw(&Some(0)),
+        Err(Ok(Error::InvalidAmount))
+    );
+    assert_eq!(
+        f.client.try_withdraw(&Some(-1)),
+        Err(Ok(Error::InvalidAmount))
+    );
+}
+
+#[test]
+fn withdraw_some_zero_distinctly_from_none_with_zero_accrued() {
+    let f = Fixture::new(true);
+    // Explicit Some(0) flows through unwrap_or untouched into require_positive.
+    // Both None and Some(0) should fail with InvalidAmount when nothing accrued.
+    let none_result = f.client.try_withdraw(&None);
+    let some_zero_result = f.client.try_withdraw(&Some(0));
+    assert_eq!(none_result, Err(Ok(Error::InvalidAmount)));
+    assert_eq!(some_zero_result, Err(Ok(Error::InvalidAmount)));
+}
+
+#[test]
+fn withdrawing_the_whole_stream_after_stop_empties_the_contract() {
+    let f = Fixture::new(true);
+    f.at(STOP + 10_000);
     assert_eq!(f.client.withdraw(&None), DEPOSITED);
+    assert_eq!(f.held(), 0);
     assert_eq!(f.client.remaining(), 0);
     f.assert_conserved();
 }
 
 #[test]
-fn duration_is_one_when_stop_is_start_plus_one() {
-    let env = Env::default();
-    let mut s = bare(&env);
-    s.stop = s.start + 1;
-    assert_eq!(s.duration(), 1);
+fn repeated_withdrawals_never_exceed_the_deposit() {
+    let f = Fixture::new(true);
+    for step in 1..=10u64 {
+        f.at(START + step * 100);
+        f.client.withdraw(&None);
+        f.assert_conserved();
+    }
+    f.at(STOP + 1);
+    assert_eq!(f.client.get().withdrawn, DEPOSITED);
+    assert_eq!(f.held(), 0);
 }
 
 #[test]
-fn is_cancelled_flips_exactly_when_cancel_is_recorded() {
-    let env = Env::default();
-    let mut s = bare(&env);
-    assert!(!s.is_cancelled());
-    s.cancelled_at = Some(START + 1);
-    assert!(s.is_cancelled());
+#[should_panic]
+fn withdraw_requires_the_recipients_authorization() {
+    let te = TestEnv::at(START);
+    let (token_client, sender) = te.make_token(MINT);
+    let token = token_client.address.clone();
+    let recipient = te.make_address();
+    let env = te.env().clone();
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    c.create(&sender, &recipient, &token, &RATE, &START, &STOP, &true);
 
-    let f = Fixture::new(true);
-    assert!(!f.client.get().is_cancelled());
-    f.at(START + 1);
-    f.client.cancel();
-    assert!(f.client.get().is_cancelled());
+    // Drop the mocks, then withdraw with nobody authorized.
+    env.set_auths(&[]);
+    env.ledger().with_mut(|l| l.timestamp = START + 100);
+    c.withdraw(&None);
 }
+
+// ------------------------------------------------------------------ cancel
+
+#[test]
+fn cancel_settles_the_recipient_and_refunds_the_sender() {
+    let f = Fixture::new(true);
+    let sender_before = f.token.balance(&f.sender);
+    f.at(START + 400);
+    f.client.cancel();
+
+    assert_eq!(f.token.balance(&f.recipient), RATE * 400);
+    assert_eq!(
+        f.token.balance(&f.sender),
+        sender_before + DEPOSITED - RATE * 400
+    );
+    assert_eq!(f.held(), 0);
+    assert_eq!(f.client.remaining(), 0);
+    f.assert_conserved();
+}
+
+#[test]
+fn cancel_emits_the_cancelled_event() {
+    let f = Fixture::new(true);
+    f.at(START + 400);
+    f.client.cancel();
+
+    // `cancel` pays out up to two token transfers before its own
+    // `Cancelled`, so take the last event rather than assuming an index.
+    let all = f.env.events().all();
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
+    let expected = Cancelled {
+        sender: f.sender.clone(),
+        settled_to_recipient: RATE * 400,
+        refunded_to_sender: DEPOSITED - RATE * 400,
+        cancelled_at: START + 400,
+    };
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
+}
+
+#[test]
+fn cancel_is_rejected_when_the_stream_is_not_cancellable() {
+    let f = Fixture::new(false);
+    f.at(START + 400);
+    assert_eq!(f.client.try_cancel(), Err(Ok(Error::StreamNotCancellable)));
+    assert_eq!(f.held(), DEPOSITED);
+}
+
+#[test]
+fn cancel_rejects_a_second_call() {
+    let f = Fixture::new(true);
+    f.at(START + 400);
+    f.client.cancel();
+    assert_eq!(f.client.try_cancel(), Err(Ok(Error::StreamCancelled)));
+}
+
+#[test]
+fn cancel_after_stop_refunds_nothing_and_settles_everything() {
+    let f = Fixture::new(true);
+    f.at(STOP + 500);
+    f.client.cancel();
+    assert_eq!(f.token.balance(&f.recipient), DEPOSITED);
+    assert_eq!(f.client.get().refunded, 0);
+    f.assert_conserved();
+}
+
+#[test]
+fn cancel_before_start_refunds_the_whole_deposit() {
+    let f = Fixture::new(true);
+    let sender_before = f.token.balance(&f.sender);
+    // Still at `start`; nothing has accrued.
+    f.client.cancel();
+    assert_eq!(f.token.balance(&f.recipient), 0);
+    assert_eq!(f.token.balance(&f.sender), sender_before + DEPOSITED);
+    f.assert_conserved();
+}
+
+#[test]
+fn cancel_settles_only_what_was_not_already_withdrawn() {
+    let f = Fixture::new(true);
+    f.at(START + 200);
+    f.client.withdraw(&None);
+    f.at(START + 500);
+    f.client.cancel();
+
+    assert_eq!(f.token.balance(&f.recipient), RATE * 500);
+    assert_eq!(f.client.get().withdrawn, RATE * 500);
+    f.assert_conserved();
+}
+
+#[test]
+fn nothing_accrues_after_cancellation() {
+    let f = Fixture::new(true);
+    f.at(START + 300);
+    f.client.cancel();
+    f.at(STOP + 10_000);
+    assert_eq!(f.client.balance_of(&f.recipient), 0);
+    assert_eq!(f.client.try_withdraw(&None), Err(Ok(Error::InvalidAmount)));
+    f.assert_conserved();
+}
+
+// ----------------------------------------------------------------- top_up
+
+#[test]
+fn top_up_extends_the_stop_by_the_span_it_buys() {
+    let f = Fixture::new(true);
+    f.client.top_up(&(RATE * 500));
+    let s = f.client.get();
+    assert_eq!(s.stop, STOP + 500);
+    assert_eq!(s.deposited, DEPOSITED + RATE * 500);
+    assert_eq!(f.held(), DEPOSITED + RATE * 500);
+    f.assert_conserved();
+}
+
+/// Pins the wire shape indexers decode (SPEC.md `indexed_events`). The
+/// expected value is spelled out literally rather than built from
+/// `events::ToppedUp`, so renaming a topic or a field fails here.
+#[test]
+fn top_up_emits_the_topped_up_event() {
+    let f = Fixture::new(true);
+    f.client.top_up(&(RATE * 500));
+
+    let env = &f.env;
+    let amount: Val = (RATE * 500).into_val(env);
+    let deposited: Val = (DEPOSITED + RATE * 500).into_val(env);
+    let new_stop: Val = (STOP + 500).into_val(env);
+    // Map data: keys are the field names, serialized in sorted order.
+    let data: Val = map![
+        env,
+        (Symbol::new(env, "amount"), amount),
+        (Symbol::new(env, "deposited"), deposited),
+        (Symbol::new(env, "new_stop"), new_stop),
+    ]
+    .into_val(env);
+    assert_eq!(
+        env.events().all().filter_by_contract(&f.client.address),
+        vec![
+            env,
+            (
+                f.client.address.clone(),
+                vec![
+                    env,
+                    Symbol::new(env, "stream").into_val(env),
+                    Symbol::new(env, "topped_up").into_val(env),
+                    f.sender.into_val(env),
+                ],
+                data,
+            ),
+        ]
+    );
+}
+
+#[test]
+fn top_up_rejects_an_amount_that_is_not_a_whole_number_of_seconds() {
+    let f = Fixture::new(true);
+    assert_eq!(
+        f.client.try_top_up(&(RATE + 1)),
+        Err(Ok(Error::InvalidAmount))
+    );
+    assert_eq!(f.client.try_top_up(&1), Err(Ok(Error::InvalidAmount)));
+}
+
+#[test]
+fn top_up_rejects_non_positive_amounts() {
+    let f = Fixture::new(true);
+    assert_eq!(f.client.try_top_up(&0), Err(Ok(Error::InvalidAmount)));
+    assert_eq!(f.client.try_top_up(&(-RATE)), Err(Ok(Error::InvalidAmount)));
+}
+
+#[test]
+fn top_up_rejects_a_span_that_overflows_the_stop_timestamp() {
+    // rate = 1, duration = 1 keeps `deposited` tiny, so this isolates the
+    // `amount / rate` -> u64 conversion: `2^64` seconds is beyond `u64::MAX`,
+    // so extending `stop` by it could not even be represented. The contract
+    // must reject rather than silently truncate the seconds (which would
+    // break the funding invariant).
+    let te = TestEnv::at(START);
+    let (token_client, sender) = te.make_token(i128::MAX);
+    let token = token_client.address.clone();
+    let recipient = te.make_address();
+    let env = te.env().clone();
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    c.create(&sender, &recipient, &token, &1, &START, &(START + 1), &true);
+
+    assert_eq!(
+        c.try_top_up(&(1_i128 << 64)),
+        Err(Ok(Error::InvalidTimeRange))
+    );
+
+    // The failed call changed nothing.
+    let s = c.get();
+    assert_eq!(s.stop, START + 1);
+    assert_eq!(s.deposited, 1);
+}
+
+#[test]
+fn top_up_is_rejected_after_cancellation() {
+    let f = Fixture::new(true);
+    f.client.cancel();
+    assert_eq!(
+        f.client.try_top_up(&(RATE * 10)),
+        Err(Ok(Error::StreamCancelled))
+    );
+}
+
+// ----------------------------------------------------------------- extend
+
+#[test]
+fn extend_pulls_the_funds_the_longer_span_requires() {
+    let f = Fixture::new(true);
+    let sender_before = f.token.balance(&f.sender);
+    f.client.extend(&(STOP + 300));
+
+    let s = f.client.get();
+    assert_eq!(s.stop, STOP + 300);
+    assert_eq!(s.deposited, DEPOSITED + RATE * 300);
+    assert_eq!(f.token.balance(&f.sender), sender_before - RATE * 300);
+    f.assert_conserved();
+}
+
+#[test]
+fn extend_rejects_a_stop_that_is_not_later() {
+    let f = Fixture::new(true);
+    for bad in [STOP, STOP - 1, 0] {
+        assert_eq!(
+            f.client.try_extend(&bad),
+            Err(Ok(Error::StreamNotExtendable)),
+            "new_stop {bad} was accepted"
+        );
+    }
+}
+
+#[test]
+fn extend_rejects_funding_that_overflows() {
+    // rate = i128::MAX over a 1-second span funds exactly i128::MAX (the
+    // boundary pinned by `create_allows_the_exact_max_funding_boundary`).
+    // Extending by 2 more seconds needs MAX * 2, which overflows i128, so
+    // `extend` must report Overflow rather than wrap.
+    let te = TestEnv::at(START);
+    let (token_client, sender) = te.make_token(i128::MAX);
+    let token = token_client.address.clone();
+    let recipient = te.make_address();
+    let c = StreamContractClient::new(te.env(), &te.env().register(StreamContract, ()));
+    c.create(
+        &sender,
+        &recipient,
+        &token,
+        &i128::MAX,
+        &START,
+        &(START + 1),
+        &true,
+    );
+
+    assert_eq!(c.try_extend(&(START + 3)), Err(Ok(Error::Overflow)));
+
+    // The failed call changed nothing.
+    let s = c.get();
+    assert_eq!(s.stop, START + 1);
+    assert_eq!(s.deposited, i128::MAX);
+}
+
+#[test]
+fn extend_is_rejected_after_cancellation() {
+    let f = Fixture::new(true);
+    f.client.cancel();
+    assert_eq!(
+        f.client.try_extend(&(STOP + 100)),
+        Err(Ok(Error::StreamCancelled))
+    );
+}
+
+/// Pins the wire shape indexers decode (SPEC.md `indexed_events`). The
+/// expected value is spelled out literally rather than built from
+/// `events::Extended`, so renaming a topic or a field fails here.
+#[test]
+fn extend_emits_the_extended_event() {
+    let f = Fixture::new(true);
+    let new_stop_val = STOP + 300;
+    f.client.extend(&new_stop_val);
+
+    let env = &f.env;
+    let added: Val = (RATE * 300).into_val(env);
+    let deposited: Val = (DEPOSITED + RATE * 300).into_val(env);
+    let new_stop: Val = new_stop_val.into_val(env);
+    // Map data: keys are the field names, serialized in sorted order.
+    let data: Val = map![
+        env,
+        (Symbol::new(env, "added"), added),
+        (Symbol::new(env, "deposited"), deposited),
+        (Symbol::new(env, "new_stop"), new_stop),
+    ]
+    .into_val(env);
+    assert_eq!(
+        env.events().all().filter_by_contract(&f.client.address),
+        vec![
+            env,
+            (
+                f.client.address.clone(),
+                vec![
+                    env,
+                    Symbol::new(env, "stream").into_val(env),
+                    Symbol::new(env, "extended").into_val(env),
+                    f.sender.into_val(env),
+                ],
+                data,
+            ),
+        ]
+    );
+}
+
+// -------------------------------------------------------------- balance_of
+
+#[test]
+fn balance_of_reports_each_partys_position() {
+    let f = Fixture::new(true);
+    f.at(START + 250);
+    assert_eq!(f.client.balance_of(&f.recipient), RATE * 250);
+    assert_eq!(f.client.balance_of(&f.sender), DEPOSITED - RATE * 250);
+    assert_eq!(f.client.balance_of(&f.outsider), 0);
+}
+
+#[test]
+fn balance_of_sender_is_zero_once_cancelled() {
+    let f = Fixture::new(true);
+    f.at(START + 250);
+    f.client.cancel();
+    assert_eq!(f.client.balance_of(&f.sender), 0);
+    assert_eq!(f.client.balance_of(&f.recipient), 0);
+}
+
+// ---------------------------------------------------- conservation, mixed
+
+#[test]
+fn conservation_holds_across_a_full_mixed_lifecycle() {
+    let f = Fixture::new(true);
+    f.assert_conserved();
+
+    f.at(START + 100);
+    f.client.withdraw(&Some(RATE * 50));
+    f.assert_conserved();
+
+    f.client.top_up(&(RATE * 200));
+    f.assert_conserved();
+
+    f.at(START + 400);
+    f.client.extend(&(STOP + 500));
+    f.assert_conserved();
+
+    f.client.withdraw(&None);
+    f.assert_conserved();
+
+    f.at(START + 900);
+    f.client.cancel();
+    f.assert_conserved();
+
+    // Everything is out, and the two sides sum to what went in.
+    let s = f.client.get();
+    assert_eq!(f.held(), 0);
+    assert_eq!(s.withdrawn + s.refunded, s.deposited);
+    assert_eq!(
+        f.token.balance(&f.recipient) + f.token.balance(&f.sender),
+        MINT
+    );
+}
+
+#[test]
+fn deposited_calculation_matches_across_top_ups_and_extends() {
+    let f = Fixture::new(true);
+    let mut s = f.client.get();
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
+
+    // First top_up: add 100 seconds of funding
+    f.client.top_up(&(RATE * 100));
+    s = f.client.get();
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
+
+    // First extend: move stop forward by 50 seconds
+    f.client.extend(&(s.stop + 50));
+    s = f.client.get();
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
+
+    // Second top_up: add 200 seconds
+    f.client.top_up(&(RATE * 200));
+    s = f.client.get();
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
+
+    // Second extend: move stop forward by 75 seconds
+    f.client.extend(&(s.stop + 75));
+    s = f.client.get();
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
+
+    // Third top_up: add 150 seconds
+    f.client.top_up(&(RATE * 150));
+    s = f.client.get();
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
+
+    // Third extend: move stop forward by 300 seconds
+    f.client.extend(&(s.stop + 300));
+    s = f.client.get();
+    assert_eq!(s.deposited, RATE * i128::from(s.stop - s.start));
+
+    // Verify conservation still holds after all operations
+    f.assert_conserved();
+}
+
+// ----------------------------------------------- negative auth tests (#109)
+
+#[test]
+#[should_panic]
+fn cancel_requires_the_senders_authorization() {
+    let f = Fixture::new(true);
+    f.at(START + 100);
+    // Clear auths so require_auth bites.
+    f.env.set_auths(&[]);
+    f.client.cancel();
+}
+
+#[test]
+#[should_panic]
+fn top_up_requires_the_senders_authorization() {
+    let f = Fixture::new(true);
+    f.at(START + 100);
+    // Clear auths so require_auth bites.
+    f.env.set_auths(&[]);
+    f.client.top_up(&(RATE * 100));
+}
+
+#[test]
+#[should_panic]
+fn extend_requires_the_senders_authorization() {
+    let f = Fixture::new(true);
+    f.at(START + 100);
+    let s = f.client.get();
+    // Clear auths so require_auth bites.
+    f.env.set_auths(&[]);
+    f.client.extend(&(s.stop + 100));
+}
+
+// ---------------------------------------------------------------- property
+
+mod accrued_at_properties {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    fn arb_stream(env: &Env) -> Stream {
+        Stream {
+            sender: Address::generate(env),
+            recipient: Address::generate(env),
+            token: Address::generate(env),
+            rate_per_second: 0,
+            start: 0,
+            stop: 1,
+            cancellable: false,
+            deposited: 0,
+            withdrawn: 0,
+            refunded: 0,
+            cancelled_at: None,
+        }
+    }
+
+    proptest! {
+        /// `accrued_at` can never exceed `deposited`, no matter how far past
+        /// `stop` -- or how large a rate -- it is asked about. The stream is
+        /// only ever funded for `rate_per_second * (stop - start)`, so
+        /// accrual cannot pay out more than was ever put in.
+        #[test]
+        fn accrued_at_never_exceeds_deposit(
+            rate_per_second in 0i128..=1_000_000_000,
+            start in 0u64..=1_000_000_000,
+            span in 1u64..=10_000_000,
+            at_offset in 0u64..=20_000_000,
+        ) {
+            let env = Env::default();
+            let stop = start + span;
+            let deposited = rate_per_second * i128::from(span);
+
+            let stream = Stream {
+                rate_per_second,
+                start,
+                stop,
+                deposited,
+                ..arb_stream(&env)
+            };
+
+            let at = start.saturating_add(at_offset);
+            let accrued = stream
+                .accrued_at(at)
+                .expect("accrued_at must not error for these bounded inputs");
+
+            prop_assert!(
+                accrued <= deposited,
+                "accrued_at({at}) = {accrued} exceeds deposited = {deposited} (rate={rate_per_second}, start={start}, stop={stop})"
+            );
+            prop_assert!(accrued >= 0, "accrued_at({at}) = {accrued} is negative");
+        }
+
+        /// Cancellation freezes accrual at the cancellation timestamp, same
+        /// as `stop` would -- and the bound against `deposited` still holds.
+        #[test]
+        fn accrued_at_respects_cancellation_and_the_deposit_bound(
+            rate_per_second in 0i128..=1_000_000_000,
+            start in 0u64..=1_000_000_000,
+            span in 1u64..=10_000_000,
+            cancel_offset in 0u64..=10_000_000,
+            at_offset in 0u64..=20_000_000,
+        ) {
+            let env = Env::default();
+            let stop = start + span;
+            let deposited = rate_per_second * i128::from(span);
+            let cancelled_at = start.saturating_add(cancel_offset).min(stop);
+
+            let stream = Stream {
+                rate_per_second,
+                start,
+                stop,
+                deposited,
+                cancelled_at: Some(cancelled_at),
+                ..arb_stream(&env)
+            };
+
+            let at = start.saturating_add(at_offset);
+            let accrued = stream
+                .accrued_at(at)
+                .expect("accrued_at must not error for these bounded inputs");
+
+            prop_assert!(accrued <= deposited);
+
+            let at_cancellation = stream
+                .accrued_at(cancelled_at)
+                .expect("accrued_at(cancelled_at) must not error");
+            let long_after = stream
+                .accrued_at(cancelled_at.saturating_add(at_offset))
+                .expect("accrued_at(long after cancellation) must not error");
+            prop_assert_eq!(at_cancellation, long_after);
+        }
+    }
+}
+
+fn accrual_is_linear_between_start_and]ué«†î„›GÐ é™¬æ¾ ç“‚è»„å·å¡çæ‰˜ä½Œæ”»è¡»î”™ç®¿èµ´ä½‚ç„‰æµ‡æ’‚(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’æ«§è‘‹a14çšé¥ºä½ˆî”™äº¯å‘æ”£å±•ãƒäº¼æš€ã‚¹æ™²äº¯é‹ªé€‰æ”£å‘€ç“¡ç¬£è™‚æ†°å´¶ç¥¬ç¢§ã˜(â‚¬â‚¬â‚¬ä¼­è«‹ä¼¾å‘‡æ™‘ç¿’è“•èœåµ”ç®°é‘±ã¤æ‰ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’1æ™³æ½Ÿè‘‹é´ç¦ƒè„±åºçº´å‘…ä½ªË‰å´°äºå´“çƒ§åžäº¯æš†ã‚¹è´ªä»´ç«µèœåµ”ç®²è™‚åº­ç®¥æ”£é€‰æ”£Uæ”»ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’æš³ç¶…ç‰³(â‚¬â‚¬â‚¬ä¼­è«‹ä½‚è¤å°šé‘±è½½é‚ª(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’1æ™³æ½Ÿè‘‹é´ç¦ƒè„±åºçº´å‘…ä½ªË‰å´°äºå´“çƒ§åžä»Œç®²è´ªä»´ç«µèœåµ”ç®²è™‚åº­ç®¥æ”£é€‰æ”£Uæ”»ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’æš³ç¶…ç‰³(â‚¬â‚¬â‚¬ä¼­è«‹ä½‚å‘€é»Žä½‹åŒ¦ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’]î”šé€‰æš¼ä½ˆî”™ä½‚æšªæ†°è‘‹ç¥¬é‹ªå´Šç®¥æšŸäº¯æš€ç¼´æ”£ä½‚å‘€ç¾³ï¿½(â‚¬â‚¬â‚¬ä¼­è«‹äº¶å‚å´ŸåŒ—åŽœçŒé‘±å£—æ¡¨ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’Qçª–åžä»Œè´‚è‘‹ç³åŒ—æ™²ä»šå±±ç£¥é€‰æ”£èœç®²æš¼çšã‚¸ä½ˆî”™ä½ˆæ±Ÿæš©æ¾¨ä½‚ç¥¬åŒ—æ›‚è¡¼å±•ãƒç«µé™›å‘­ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’ä¼¾å‘‡æ™‘ç¿’è“•èœåµ”ç®°â‚¬â–ˆâŠ¥å‘€çº®ç£¥è„±å·å•¸â‚¬ï¿½(â‚¬â‚¬â‚¬ä¼­è«‹äº¼æš³é…µãƒ‘æ™²é‘±ã¤æ‰ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’Qçª–åžä»Œè´‚è‘‹ç¾ºîš•ä¼£æ‹›ä½ˆç´’é€‰æ”£è“µå´¶éš¶æšªé‚ªä»´ç«µé€‰æ”£å‘€ç“¡ç¬£è™‚å·å¡çæ‰˜ä½Œæ”»æ‡ˆ(â‚¬â‚¬â‚¬ä¼­è«‹ä½ªãƒ‘î”–è“žèŽžé‘±ã¤æ‰ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’Qçª–åžä»Œè´‚è‘‹è“µé¢œæ™’æ™²ä½ˆç´’é€‰æ”£èœç®²æš¼ä¼£ç«µå´Šç®¥æš çœ³é´ç¤çšã‚¸ä½ˆî”™ä½ˆæ±Ÿæš©æ¾¨(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’å·å¡çæ‰˜ä½Œæ”»æ‡ˆ(â‚¬â‚¬â‚¬ä¼­è«‹ä¼¾æš€å±•æ†°æ„¯ä»±å¨œå–Ÿ(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’]î”šç«µé€‰æ”£è„±è“µå´ä½ªå¿äº¶å‚å´ŸåŒ—æ™²çšîšä»´è¡¼è¼©è´ªä»´ç«µèœåµ”ç®²è™‚åº­ç®¥æ”£é€‰æ”£Uæ”»ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’æš³ç¶…ç‰³ï¿½å´“çƒ§åžä½‚å‘€æ’‚ä»­æš½æ•»(â‚¬â‚¬â‚¬ä¼­è«‹äº¶å‚å´ŸåŒ—æ™³}å‘…é‘±=è£‚ã‚½æ ¼è½½ç»­ï¿½)ï¿½()ã‚µæ¶Ÿä¸®ç„‰æ™ ç£¥ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’Qçª–åžäºå´“çƒ§æ™²ä½ˆç´’é€‰æ”£è“µå´¶éš¶æšªè¡¼å¿ä¼£æ¦¿äºè¤‰çšè¨æ›†î”šè‘‹èªé€‰æ‡®å‘¡ç«µé¥ºä¼–å«ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’Aä¸ˆæ—‡ä¼–ç´’è„±ç¼´åŽºæ•¯ä¼–ç´’æšªä½¶å±±æ²Ÿæšªæ‡ˆï¿½
+çœ³ç›—æ™²äºè¡¼å£—è¤·ä»Œç®²è™åˆ›ä¼–çª–Ë‰ç®¿(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’åŽ¤åµ£è«˜è™‚å¢ªæ«§è“´äº–è„±å·è¤‰çšå‚æ‚‚åŽ¤åµ£è«ˆçšî”Šæ¯–è™‚å‘…äº–è„±æ…â‚¬ä¼£è‘‹å‘…ä½ˆî”™(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’å´Šç®¥æš çœ³é´ç¤ä½ˆã‚µæ›‚è¤é“çšè¨îš’î”šè´‚è‘‹åµ”ç¦ƒè™‚æ«èµæ‡ˆä¸µî”™ä¼¾æ›‚æ¯¡è¡¼å´Šç«µç®·è´‚ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’æ›–å´Ÿæ™²äº–æ†°ä¸¤åº­è¤§æ†–ï¿½(â‚¬â‚¬â‚¬ä¼­è«‹ä»šç«µåŽ¤åµ£è«˜æ†“å‘…ç‰‚èœç’çšå‘…é‘±è½½è‚–â‚¬å¸¦ä¸¡æ›‚æ¯¡æ—­ã¤æ‰çšç¼®é¥ºé´£ï¿½(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä¼‡æ›…ä¼’æ‹›ä»Œæ«ƒæ™¬é´è´â‚¬é­œå‘…ï¿½(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä»´æ¦¿çè¡¼Mé™æ•—å´Šç®¥æš çæ‚¿â‚¬é­œèœç’ç®¥å‚å´ŸåŒ—æ™³}å‘…ä¾…(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä»Œæ«ƒæ™¬é´è´â‚¬é­œæš€æª¿åµ®ãƒ™æ•¼å•æµ®å´Šç®¥æš çæ‚¿ï¿½(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä¾“(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä»Œæ«ƒæ™¬é´è´â‚¬é­œæš€æª¿åµ®ãƒ™æ•¼å•æµ®èœç’é›‡å‘€å¤ï¿½((â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä»´æ¦¿æš€æª¿åµ®ãƒ™æ”¢ç—¿ä½‚æš æ¨„è„±å·è¡¼ï¿½(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä¼¾æ›†ä¸ˆç«µ=ç‘ºå¤ï¿½(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä¾“(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä¼‡æ›…ä»Œçœ³é•£æ™²â‚¬é­œç¥¬è¤·æ é©¼åžºã¤æ‰æ æ«³é…±î”šæ«ƒæ™¬é´è´ãä»±å¨œå™¼é—„å±±ç¡€èœç’é›‡è¤å°šã„î·(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä¼‡æ›…äºå´“çƒ§æ™²â‚¬é­œç¥¬è¤·æ å«¡å•Šèœç’è‚¡å‘‡æ™‘ç¿’è“•èœåµ”ç®°çšæš åœèœæ‚¿î·(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ï¿½=î‚¼ç¥¬è¤·æ å•æµ®åŽ¤åµ£è«˜æƒä½‚æš æ¨„æ†°ä¸¤åº­è¤§æ‚¿ï¿½(â‚¬â‚¬â‚¬ä¾“((â‚¬â‚¬â‚¬â‚¬æŠ€ç´’å´“çƒ§æ™²äº¯æ‹›ä¼–å«ä½¸æ›…ä½ªãƒ‘î”–è“žèŽžçšå¿ä¼£æ¦¿äºè¤‰ç«µ]î”Šè¡¼é€‰æ”£è“µå´¶éš¶æšªè¡¼å´Šç«µè¤ç“Ÿï¿½(â‚¬â‚¬â‚¬ä¼­è«‹ä»šç«µå‘å†çœ³å£‰æ™‘å‘…ç‰‚èœç’çšå‘…é‘±è½½è‚–â‚¬å¸¦ä¸¡æ›‚æ¯¡æ—­ã¤æ‰çšç¼®é¥ºé´£ï¿½(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä¼‡æ›…äºå´“çƒ§æ™²â‚¬é­œèœç’ç®™å´“çƒ§æ™³}å‘…î”Šè‚–î·(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä»´æ¦¿èœç’é¦†ãƒ‘î”–è“žèŽžâ‚¬é´£åŽ¤åµ£è«˜æ‚‚ï¿½(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä¼¾æ›†ä¸ˆç«µæ‰‡ï¿½ç¼®é¥ºæ Uç®²æš½æ«›æ°ã‚Œ(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä¾“(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä¼’å‘‡çŠºæ©¥è«‹î”Šå´“çƒ§æ™²çšèœç’é¦†ãƒ‘î”–è“žèŽžï¿½(â‚¬â‚¬â‚¬ä¾“((â‚¬â‚¬â‚¬â‚¬æŠ€ç´’]î”Šè¡¼é€‰æ”£åµ”å¯¡è“žåµ­ä½‚é´å‘ä»­å¥–æ‡±ä»šé¥ºä½ˆË‰è™‚è„±è“µå´ï¿½(â‚¬â‚¬â‚¬ä¼­è«‹ä»šç«µè“µç¥¬ã‚¹ã‚¹æ¹¢æ«·æš æ§«â‚¬å¸¦ä¸¡æ›‚æ¯¡æ—­ã¤æ‰çšç¼®é¥ºé´£ï¿½(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä¼’å‘‡çŠºæ©¥è«‹ã€‰å‘‡çŠºæ©¥è«‹âŠ¥æš æ¨„æ†°ä¸¤åº­è¤§æƒä½‚æš æ¨„èªé€‰æ‡®å‘¡è¢±îŽ»ä½‚æš æ¨„è“µæ«¿ç®²æ™²ï¿½(â‚¬â‚¬â‚¬ä¾“((â‚¬â‚¬â‚¬â‚¬æŠ€ç´’]î”šé€‰æš¼ä½ˆî”™ä½‚ç„‰æ™ ç£¥î”Šè™‚å¢ªæš©äº¶å‚å´ŸåŒ—æ™²ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ï¿½(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’Qî”™ä¼‡îšžæ™¬é—çŒä»´è™‚å¢ºç®™å°„äºç®°ä¼£ç®¶é€’å‘¬çšå›¾ä»´è¡¼ãƒŒä¼’ç¶‰æš çæ‚‚å¤‰ä½ˆî”™(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’äº¶å‚å´ŸåŒ—æ™³}å‘‡â‚¬ä½ˆã‚µæ›‚è¤é“â‚¬â‰¥Ë‰å´°äºå´“çƒ§åžä¼–æ™»æ‡±äºç‘°è¼©æµƒä¼¾å‘‡î”šè‘‹é€‰å€äºœ(â‚¬â‚¬â‚¬â‚¬æŠ€ç´’ä¸®è¤è¤§â‚¬ä»Œæ‹ç£¥é¥±ç“Ÿä»Œè›µå±±è»¡è°ˆä¸®æ™¹â‚¬ï¿½1îšžæ™¬é—çŒä¼’ç¶‰æš ã‚¹æ¹€ä»´ç«µMAæ²Ÿæƒ›(â‚¬â‚¬â‚¬ä¼­è«‹ä»šç«µãƒ}å´Šç®¥æš çæ‚¹æ«·æš æ§«â‚¬å¸¦äº¯æµ‡çšï¿½(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä½‚æš æ¨„å´Šç®¥æš çæ†“å‘…æ”»è›šå¾’ç¦‚ç‰‘(â‚¬â‚¬â‚¬ä¾“((â‚¬â‚¬â‚¬â‚¬æŠ€ç´’Qî”™äº¼æ™¬çœ³è“µæ‚‚åœŸå€ä»´ç«µèœåµ”ç®²è°ˆ(â‚¬â‚¬â‚¬ä¼­è«‹ä»šç«µæ‡»è“žé´ç¤ç‰‚èœç’î˜¥å¸¦ä½‹åŒ¦ä¾…(â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬â‚¬ä½‚æš æ¨„è„±åš¼é›‡å‘‡ä¸ˆå‘‡ã‚¹æ½é©¼åžºèœç’é›‡è¤å°šï¿½(â‚¬â‚¬â‚¬ä¾“)ï¿½(
+ main
