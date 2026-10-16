@@ -42,21 +42,27 @@ pub struct Stream {
     pub recipient: Address,
     /// The token being streamed.
     pub token: Address,
-    /// Tokens accrued per second, in the token's smallest unit.
+    /// Tokens accrued per second, in the token's smallest unit (e.g., stroops
+    /// for XLM, or the base unit defined by the token's decimals).
     pub rate_per_second: i128,
-    /// Ledger timestamp at which accrual begins.
+    /// Ledger timestamp at which accrual begins, in seconds since the Unix
+    /// epoch.
     pub start: u64,
-    /// Ledger timestamp at which accrual ends.
+    /// Ledger timestamp at which accrual ends, in seconds since the Unix
+    /// epoch.
     pub stop: u64,
     /// Whether the sender may cancel before `stop`.
     pub cancellable: bool,
-    /// Total ever pulled from the sender. Always `rate * (stop - start)`.
+    /// Total ever pulled from the sender, in the token's smallest unit. Always
+    /// `rate_per_second * (stop - start)`.
     pub deposited: i128,
-    /// Total ever paid out to the recipient.
+    /// Total ever paid out to the recipient, in the token's smallest unit.
     pub withdrawn: i128,
-    /// Total ever returned to the sender on cancellation.
+    /// Total ever returned to the sender on cancellation, in the token's
+    /// smallest unit.
     pub refunded: i128,
-    /// When the stream was cancelled, if it was. Accrual stops here.
+    /// When the stream was cancelled, if it was, in seconds since the Unix
+    /// epoch. Accrual stops here.
     pub cancelled_at: Option<u64>,
 }
 

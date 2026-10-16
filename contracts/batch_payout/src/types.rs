@@ -32,7 +32,11 @@ pub const MAX_RECIPIENTS: u32 = 40;
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Payment {
+    /// The recipient's address. Must be a valid Stellar address.
     pub to: Address,
+    /// The amount to transfer, in the token's smallest unit (e.g., stroops for
+    /// XLM, or the base unit defined by the token's decimals). Must be
+    /// non-negative; negative amounts are rejected.
     pub amount: i128,
 }
 

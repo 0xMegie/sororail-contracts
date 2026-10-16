@@ -30,15 +30,21 @@ pub struct Authorization {
     pub payee: Address,
     /// The token being charged.
     pub token: Address,
-    /// The most that may be pulled in any one period.
+    /// The most that may be pulled in any one period, in the token's smallest
+    /// unit (e.g., stroops for XLM, or the base unit defined by the token's
+    /// decimals).
     pub amount_per_period: i128,
-    /// The cadence, in seconds.
+    /// The cadence, in seconds. Each charge advances `next_chargeable_at` by
+    /// this duration.
     pub period_seconds: u64,
-    /// Cap on the number of charges, if any. `None` is open-ended.
+    /// Cap on the number of charges, if any. `None` means no cap: charges may
+    /// continue indefinitely as long as the authorization is not cancelled and
+    /// the payer's token allowance remains sufficient.
     pub max_periods: Option<u32>,
     /// How many charges have been taken.
     pub periods_charged: u32,
-    /// The earliest ledger timestamp at which the next charge may be taken.
+    /// The earliest ledger timestamp at which the next charge may be taken, in
+    /// seconds since the Unix epoch.
     pub next_chargeable_at: u64,
     /// Whether either party has cancelled.
     ///
