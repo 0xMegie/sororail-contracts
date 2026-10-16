@@ -111,6 +111,57 @@ fn init_stores_the_agreement() {
 }
 
 #[test]
+fn get_returns_all_agreement_fields() {
+    let f = Fixture::new(true);
+    let e = f.client.get();
+    assert_eq!(e.depositor, f.depositor);
+    assert_eq!(e.beneficiary, f.beneficiary);
+    assert_eq!(e.arbiter, Some(f.arbiter.clone()));
+    assert_eq!(e.token, f.token.address);
+    assert_eq!(e.amount, AMOUNT);
+    assert_eq!(e.deadline, DEADLINE);
+    assert_eq!(e.state, State::Created);
+
+    // Without an arbiter, `None` round-trips too.
+    let g = Fixture::new(false);
+    let eg = g.client.get();
+    assert_eq!(eg.arbiter, None);
+    assert_eq!(eg.token, g.token.address);
+    assert_eq!(eg.amount, AMOUNT);
+    assert_eq!(eg.deadline, DEADLINE);
+}
+
+#[test]
+fn state_returns_each_variant_across_lifecycle() {
+    // Created -> Funded -> Released.
+    let f = Fixture::new(true);
+    assert_eq!(f.client.state(), State::Created);
+    f.client.fund();
+    assert_eq!(f.client.state(), State::Funded);
+    f.client.release(&f.depositor);
+    assert_eq!(f.client.state(), State::Released);
+
+    // Created -> Funded -> Refunded.
+    let g = Fixture::new(true);
+    assert_eq!(g.client.state(), State::Created);
+    g.client.fund();
+    assert_eq!(g.client.state(), State::Funded);
+    g.advance_past_deadline();
+    g.client.refund(&g.depositor);
+    assert_eq!(g.client.state(), State::Refunded);
+
+    // Created -> Funded -> Disputed -> Resolved.
+    let h = Fixture::new(true);
+    assert_eq!(h.client.state(), State::Created);
+    h.client.fund();
+    assert_eq!(h.client.state(), State::Funded);
+    h.client.dispute(&h.depositor);
+    assert_eq!(h.client.state(), State::Disputed);
+    h.client.resolve(&5_000);
+    assert_eq!(h.client.state(), State::Resolved);
+}
+
+#[test]
 fn init_rejects_a_second_call() {
     let f = Fixture::new(true);
     let res = f.client.try_init(
@@ -126,7 +177,7 @@ fn init_rejects_a_second_call() {
 
 #[test]
 fn init_rejects_non_positive_amounts() {
-    let env = TestEnv::at(START_TS).env;
+    let env = TestEnv::at(START_TS).env().clone();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
     let client = EscrowContractClient::new(&env, &env.register(EscrowContract, ()));
@@ -146,7 +197,7 @@ fn init_rejects_non_positive_amounts() {
 
 #[test]
 fn init_rejects_a_deadline_that_is_not_in_the_future() {
-    let env = TestEnv::at(START_TS).env;
+    let env = TestEnv::at(START_TS).env().clone();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
     let client = EscrowContractClient::new(&env, &env.register(EscrowContract, ()));
@@ -167,7 +218,7 @@ fn init_rejects_a_deadline_that_is_not_in_the_future() {
 
 #[test]
 fn entry_points_error_before_init() {
-    let env = TestEnv::new().env;
+    let env = TestEnv::new().env().clone();
     env.mock_all_auths();
     let client = EscrowContractClient::new(&env, &env.register(EscrowContract, ()));
     let who = Address::generate(&env);
