@@ -15,6 +15,7 @@
 #![allow(clippy::arithmetic_side_effects)]
 
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -262,6 +263,50 @@ fn every_public_event_has_a_pinned_topic_name() {
         expected,
         "public event topic names changed; review indexer compatibility in {}",
         root.display()
+    );
+}
+
+#[test]
+fn every_event_topic_pair_is_unique_across_contracts() {
+    // Action symbols such as `cancelled` are intentionally reused by different
+    // contracts. The full [contract, action] pair is the topic identity used
+    // by indexers, and it must identify exactly one event across the workspace.
+    let mut occurrences_by_topic: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
+
+    for (name, dir) in contract_crates() {
+        if NON_CONTRACT_CRATES.contains(&name.as_str()) {
+            continue;
+        }
+
+        for occurrence in occurrences(&dir) {
+            let contract = occurrence.topics.first().unwrap_or_else(|| {
+                panic!(
+                    "{}:{} has no contract topic",
+                    occurrence.file.display(),
+                    occurrence.line
+                )
+            });
+            let action = occurrence.topics.get(1).unwrap_or_else(|| {
+                panic!(
+                    "{}:{} has no action topic",
+                    occurrence.file.display(),
+                    occurrence.line
+                )
+            });
+            occurrences_by_topic
+                .entry((contract.clone(), action.clone()))
+                .or_default()
+                .push(format!("{}:{}", occurrence.file.display(), occurrence.line));
+        }
+    }
+
+    let duplicates: Vec<_> = occurrences_by_topic
+        .into_iter()
+        .filter(|(_, locations)| locations.len() > 1)
+        .collect();
+    assert!(
+        duplicates.is_empty(),
+        "event topic pairs must identify exactly one event across the workspace; duplicates: {duplicates:?}"
     );
 }
 

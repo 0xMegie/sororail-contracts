@@ -764,3 +764,144 @@ fn batch_and_recurring_payroll_workflow() {
         MINT
     );
 }
+
+/// A batch can pay a first-time recipient, someone with an existing balance,
+/// and the same recipient more than once without losing or merging payments.
+#[test]
+fn batch_payout_handles_new_existing_and_duplicate_recipients() {
+    let s = System::new();
+    let new_recipient = Address::generate(&s.env);
+    let existing_recipient = Address::generate(&s.env);
+    let repeated_recipient = Address::generate(&s.env);
+    let parties = [&new_recipient, &existing_recipient, &repeated_recipient];
+
+    // Give one recipient a balance before the mixed batch.
+    s.token.transfer(&s.employer, &existing_recipient, &100);
+
+    let payments = vec![
+        &s.env,
+        Payment {
+            to: new_recipient.clone(),
+            amount: 11,
+        },
+        Payment {
+            to: existing_recipient.clone(),
+            amount: 22,
+        },
+        Payment {
+            to: repeated_recipient.clone(),
+            amount: 33,
+        },
+        Payment {
+            to: repeated_recipient.clone(),
+            amount: 44,
+        },
+    ];
+
+    let receipt = s.batch.execute(&s.employer, &s.token.address, &payments);
+
+    assert_eq!(receipt.count, 4);
+    assert_eq!(receipt.total, 110);
+    assert_eq!(s.balance(&new_recipient), 11);
+    assert_eq!(s.balance(&existing_recipient), 122);
+    assert_eq!(s.balance(&repeated_recipient), 77);
+    s.assert_nothing_lost(&parties);
+}
+
+/// Recurring authorizations charge once per elapsed period and stop at their
+/// configured cap, even when another charge is attempted immediately.
+#[test]
+fn recurring_subscription_charges_once_across_several_periods() {
+    let s = System::new();
+    let vendor = Address::generate(&s.env);
+    let parties = [&vendor];
+    let amount = 125_000;
+    let periods = 3;
+
+    s.recurring.authorize(
+        &s.employer,
+        &vendor,
+        &s.token.address,
+        &amount,
+        &MONTH,
+        &Some(periods),
+    );
+    let expiry = s.env.ledger().sequence() + 500_000;
+    s.token
+        .approve(&s.employer, &s.recurring.address, &MINT, &expiry);
+
+    for period in 1..=periods {
+        let due_at = START + MONTH * u64::from(period);
+        s.at(due_at - 1);
+        assert_eq!(
+            s.recurring.try_charge(),
+            Err(Ok(sororail_common::Error::RecurringPeriodNotElapsed))
+        );
+        assert_eq!(s.balance(&vendor), amount * i128::from(period - 1));
+
+        s.at(due_at);
+        assert_eq!(s.recurring.charge(), amount);
+        assert_eq!(s.balance(&vendor), amount * i128::from(period));
+        let second_charge_error = if period == periods {
+            sororail_common::Error::RecurringExhausted
+        } else {
+            sororail_common::Error::RecurringPeriodNotElapsed
+        };
+        assert_eq!(s.recurring.try_charge(), Err(Ok(second_charge_error)));
+        s.assert_nothing_lost(&parties);
+    }
+
+    assert_eq!(s.recurring.remaining_periods(), Some(0));
+    s.at(START + MONTH * u64::from(periods + 1));
+    assert_eq!(
+        s.recurring.try_charge(),
+        Err(Ok(sororail_common::Error::RecurringExhausted))
+    );
+    assert_eq!(s.balance(&vendor), amount * i128::from(periods));
+    s.assert_nothing_lost(&parties);
+}
+
+/// Every stateful contract reports `NotInitialized` from a state-backed view
+/// before its setup entry point has run. `batch_payout` is stateless, so it has
+/// no initialization state to reject.
+#[test]
+fn stateful_contracts_reject_calls_before_initialization() {
+    let s = System::new();
+    let stateful_contracts = [
+        (
+            "escrow",
+            matches!(
+                s.escrow.try_get(),
+                Err(Ok(sororail_common::Error::NotInitialized))
+            ),
+        ),
+        (
+            "stream",
+            matches!(
+                s.stream.try_get(),
+                Err(Ok(sororail_common::Error::NotInitialized))
+            ),
+        ),
+        (
+            "vesting",
+            matches!(
+                s.vesting.try_get(),
+                Err(Ok(sororail_common::Error::NotInitialized))
+            ),
+        ),
+        (
+            "recurring",
+            matches!(
+                s.recurring.try_get(),
+                Err(Ok(sororail_common::Error::NotInitialized))
+            ),
+        ),
+    ];
+
+    for (name, rejects_uninitialized_call) in stateful_contracts {
+        assert!(
+            rejects_uninitialized_call,
+            "{name} did not return NotInitialized"
+        );
+    }
+}
