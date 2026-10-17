@@ -144,7 +144,8 @@ Funds held by the contract, released on a condition.
 - `release(caller)` — beneficiary receives; callable by depositor or arbiter
 - `refund(caller)` — callable by depositor after deadline, or by arbiter at any time. If in `Disputed` state, callable by anyone after 7 days past the original deadline to recover from an unresponsive arbiter.
 - `dispute(caller)` / `resolve(split_bps)` — arbiter splits between parties; `split_bps` is the beneficiary's share
-- `dispute` requires a configured arbiter and errors otherwise, so `Disputed` is never reachable without one; `resolve` re-checks independently as defense-in-depth.
+- `dispute` requires a configured arbiter; calling it without one returns `EscrowNoArbiter`, so `Disputed` is never reachable without an arbiter. `resolve` re-checks independently as defense-in-depth.
+- Calling `dispute` on an escrow that is already in `Disputed` state returns `EscrowAlreadyDisputed`. Once disputed, a second `dispute` call is rejected so the arbiter cannot be overridden mid-resolution.
 - `fund` requires `deadline` not to have passed (inclusive); past it, it errors with a dedicated `DeadlinePassed` rather than the generic `EscrowClosed`, since the escrow is still `Created`, not terminal.
 - States: `Created → Funded → (Released | Refunded | Disputed → Resolved)`. Illegal transitions must error, not panic.
 - **Dispute timeout:** Once the deadline passes, an unresolved dispute has a 7-day grace period. After this period, either party (or anyone) may refund to recover funds from an unresponsive arbiter. This is a safety mechanism, not a normal flow.
