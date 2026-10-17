@@ -94,7 +94,10 @@ macro_rules! impl_single_position_storage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::{contracttype, testutils::Ledger, Env};
+    use soroban_sdk::{contract, contracttype, testutils::Ledger, Env};
+
+    #[contract]
+    struct StorageTestHost;
 
     // Test data structure for macro testing
     #[contracttype]
@@ -112,92 +115,107 @@ mod tests {
     // Generate storage helpers for testing
     impl_single_position_storage!(TestData, TestDataKey::TestKey);
 
+    /// sdk 27 only allows storage access from a contract frame, so each test
+    /// runs inside `env.as_contract`.
+    fn host() -> (Env, soroban_sdk::Address) {
+        let env = Env::default();
+        let id = env.register(StorageTestHost, ());
+        (env, id)
+    }
+
     /// Issue #273: Test extend_instance with a short TTL
     #[test]
     fn test_extend_instance_with_short_ttl() {
-        let env = Env::default();
-        
-        // Set up initial storage with a short TTL (less than threshold)
-        let short_ttl = INSTANCE_THRESHOLD - 100; // Below threshold
-        env.storage().instance().set(&TestDataKey::TestKey, &42u64);
-        env.storage().instance().extend_ttl(short_ttl, short_ttl);
-        
-        // Call extend_instance
-        extend_instance(&env);
-        
-        // Verify TTL was extended to INSTANCE_BUMP
-        // We can't directly read TTL, but we can verify the function doesn't panic
-        // and that storage is still accessible after advancing ledgers
-        env.ledger().set_sequence_number(env.ledger().sequence() + short_ttl);
-        
-        // Storage should still be accessible after short_ttl ledgers
-        // (because it was extended to INSTANCE_BUMP)
-        let value: Option<u64> = env.storage().instance().get(&TestDataKey::TestKey);
-        assert!(value.is_some(), "Storage should still be accessible after TTL extension");
+        let (env, id) = host();
+        env.as_contract(&id, || {
+            // Set up initial storage with a short TTL (less than threshold)
+            let short_ttl = INSTANCE_THRESHOLD - 100; // Below threshold
+            env.storage().instance().set(&TestDataKey::TestKey, &42u64);
+            env.storage().instance().extend_ttl(short_ttl, short_ttl);
+
+            // Call extend_instance
+            extend_instance(&env);
+
+            // Verify TTL was extended to INSTANCE_BUMP
+            // We can't directly read TTL, but we can verify the function doesn't panic
+            // and that storage is still accessible after advancing ledgers
+            env.ledger()
+                .set_sequence_number(env.ledger().sequence() + short_ttl);
+
+            // Storage should still be accessible after short_ttl ledgers
+            // (because it was extended to INSTANCE_BUMP)
+            let value: Option<u64> = env.storage().instance().get(&TestDataKey::TestKey);
+            assert!(
+                value.is_some(),
+                "Storage should still be accessible after TTL extension"
+            );
+        });
     }
 
     /// Issue #274: Test generated load helper when key is missing
     #[test]
     fn test_load_when_key_missing() {
-        let env = Env::default();
-        
-        // Attempt to load without initializing
-        let result = load(&env);
-        
-        // Assert NotInitialized error is returned
-        assert!(result.is_err(), "load should return error when key is missing");
-        assert_eq!(
-            result.unwrap_err(),
-            crate::Error::NotInitialized,
-            "Error should be NotInitialized"
-        );
+        let (env, id) = host();
+        env.as_contract(&id, || {
+            // Attempt to load without initializing
+            let result = load(&env);
+
+            // Assert NotInitialized error is returned
+            assert!(
+                result.is_err(),
+                "load should return error when key is missing"
+            );
+            assert_eq!(
+                result.unwrap_err(),
+                crate::Error::NotInitialized,
+                "Error should be NotInitialized"
+            );
+        });
     }
 
     /// Issue #275: Test generated save and load round trip
     #[test]
     fn test_save_and_load_round_trip() {
-        let env = Env::default();
-        
+        let (env, id) = host();
         // Create test data
         let test_data = TestData {
             value: 12345,
             name: soroban_sdk::String::from_str(&env, "test-name"),
         };
-        
-        // Save the data
-        save(&env, &test_data);
-        
-        // Load it back
-        let loaded = load(&env).expect("load should succeed after save");
-        
-        // Assert saved value loads back equal
-        assert_eq!(
-            loaded, test_data,
-            "Loaded value should equal saved value"
-        );
-        
-        // Also test load_view
-        let loaded_view = load_view(&env).expect("load_view should succeed after save");
-        assert_eq!(
-            loaded_view, test_data,
-            "load_view should return same value as load"
-        );
+        env.as_contract(&id, || {
+            // Save the data
+            save(&env, &test_data);
+
+            // Load it back
+            let loaded = load(&env).expect("load should succeed after save");
+
+            // Assert saved value loads back equal
+            assert_eq!(loaded, test_data, "Loaded value should equal saved value");
+
+            // Also test load_view
+            let loaded_view = load_view(&env).expect("load_view should succeed after save");
+            assert_eq!(
+                loaded_view, test_data,
+                "load_view should return same value as load"
+            );
+        });
     }
 
     #[test]
     fn test_is_initialized() {
-        let env = Env::default();
-        
-        // Initially not initialized
-        assert!(!is_initialized(&env), "Should not be initialized initially");
-        
-        // After save, should be initialized
-        let test_data = TestData {
-            value: 999,
-            name: soroban_sdk::String::from_str(&env, "init-test"),
-        };
-        save(&env, &test_data);
-        
-        assert!(is_initialized(&env), "Should be initialized after save");
+        let (env, id) = host();
+        env.as_contract(&id, || {
+            // Initially not initialized
+            assert!(!is_initialized(&env), "Should not be initialized initially");
+
+            // After save, should be initialized
+            let test_data = TestData {
+                value: 999,
+                name: soroban_sdk::String::from_str(&env, "init-test"),
+            };
+            save(&env, &test_data);
+
+            assert!(is_initialized(&env), "Should be initialized after save");
+        });
     }
 }

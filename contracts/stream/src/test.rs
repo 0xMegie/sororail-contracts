@@ -774,6 +774,10 @@ fn cancel_rejects_a_second_call() {
 
 /// Only the sender may cancel: a caller authorizing as anyone else hits the
 /// host's auth check, not a contract error, and the stream is left intact.
+///
+/// The host narrows every non-`Contract` host error to
+/// `Context`/`InvalidAction` before it crosses back to the guest, so a failed
+/// `require_auth` surfaces as that pair rather than `Auth`/`InvalidAction`.
 #[test]
 fn cancel_is_rejected_for_a_non_sender_caller() {
     let f = Fixture::new(true);
@@ -800,7 +804,7 @@ fn cancel_is_rejected_for_a_non_sender_caller() {
         assert_eq!(
             res,
             Err(Ok(soroban_sdk::Error::from_type_and_code(
-                ScErrorType::Auth,
+                ScErrorType::Context,
                 ScErrorCode::InvalidAction,
             )))
         );
@@ -1218,7 +1222,8 @@ fn balance_of_sender_is_zero_once_cancelled() {
 }
 
 #[test]
-fn balance_of_shows_the_recipient_accrued_minus_withdrawn_and_the_sender_the_unstreamed_remainder() {
+fn balance_of_shows_the_recipient_accrued_minus_withdrawn_and_the_sender_the_unstreamed_remainder()
+{
     let f = Fixture::new(true);
     f.at(START + 300);
     f.client.withdraw(&Some(RATE * 100));

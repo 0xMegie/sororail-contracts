@@ -44,6 +44,7 @@ or renumbers a variant in `errors.rs`.
 | 63 | `VestingRevoked` | vesting | The grant has already been revoked. |
 | 64 | `VestingCliffAfterEnd` | vesting | The cliff falls after the end of the vesting period. |
 | 65 | `VestingNothingToClaim` | vesting | Nothing vested-but-unclaimed remains to claim. |
+| 66 | `VestingScheduleOverflow` | vesting | `start + duration` would overflow `u64`. |
 | 80 | `RecurringNotFound` | recurring | No authorization exists for the given id. |
 | 81 | `RecurringCancelled` | recurring | The authorization has been cancelled. |
 | 82 | `RecurringPeriodNotElapsed` | recurring | `charge` called before `next_chargeable_at` (including the first charge). |
