@@ -998,6 +998,66 @@ fn top_up_rejects_a_span_that_overflows_the_stop_timestamp() {
 }
 
 #[test]
+fn top_up_rejects_seconds_that_fit_u64_but_overflow_the_stop_timestamp() {
+    // rate = 1, so `amount` is exactly the seconds added. Unlike the `2^64`
+    // case above, `seconds` here is a valid `u64`, so the `u64::try_from` step
+    // passes and only the `stop.checked_add(seconds)` step can reject it:
+    // `(START + 1) + (u64::MAX - START)` is `u64::MAX + 1`.
+    let te = TestEnv::at(START);
+    let (token_client, sender) = te.make_token(i128::MAX);
+    let token = token_client.address.clone();
+    let recipient = te.make_address();
+    let env = te.env().clone();
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    c.create(&sender, &recipient, &token, &1, &START, &(START + 1), &true);
+
+    assert_eq!(
+        c.try_top_up(&i128::from(u64::MAX - START)),
+        Err(Ok(Error::InvalidTimeRange))
+    );
+
+    // The failed call changed nothing.
+    let s = c.get();
+    assert_eq!(s.stop, START + 1);
+    assert_eq!(s.deposited, 1);
+
+    // One second less lands exactly on `u64::MAX`, the largest `stop` that
+    // can be represented, and must be accepted.
+    c.top_up(&i128::from(u64::MAX - START - 1));
+    assert_eq!(c.get().stop, u64::MAX);
+}
+
+#[test]
+fn top_up_rejects_a_deposit_total_that_overflows() {
+    // rate = i128::MAX / 2 over a 1-second span funds `rate`. Topping up
+    // 2 seconds' worth (`2 * rate == i128::MAX - 1`) is itself representable and
+    // a whole number of seconds, but `deposited + amount` is not.
+    let rate = i128::MAX / 2;
+    let te = TestEnv::at(START);
+    let (token_client, sender) = te.make_token(i128::MAX);
+    let token = token_client.address.clone();
+    let recipient = te.make_address();
+    let env = te.env().clone();
+    let c = StreamContractClient::new(&env, &env.register(StreamContract, ()));
+    c.create(
+        &sender,
+        &recipient,
+        &token,
+        &rate,
+        &START,
+        &(START + 1),
+        &true,
+    );
+
+    assert_eq!(c.try_top_up(&(rate * 2)), Err(Ok(Error::Overflow)));
+
+    // The failed call changed nothing.
+    let s = c.get();
+    assert_eq!(s.stop, START + 1);
+    assert_eq!(s.deposited, rate);
+}
+
+#[test]
 fn top_up_is_rejected_after_cancellation() {
     let f = Fixture::new(true);
     f.client.cancel();
@@ -1080,6 +1140,35 @@ fn extend_rejects_funding_that_overflows() {
     let s = c.get();
     assert_eq!(s.stop, START + 1);
     assert_eq!(s.deposited, i128::MAX);
+}
+
+#[test]
+fn extend_rejects_a_deposit_total_that_overflows() {
+    // rate = i128::MAX / 2 over a 1-second span funds `rate`. Extending by 2
+    // more seconds needs `2 * rate == i128::MAX - 1`, which is representable,
+    // so the multiplication passes and only `deposited + added` overflows.
+    let rate = i128::MAX / 2;
+    let te = TestEnv::at(START);
+    let (token_client, sender) = te.make_token(i128::MAX);
+    let token = token_client.address.clone();
+    let recipient = te.make_address();
+    let c = StreamContractClient::new(te.env(), &te.env().register(StreamContract, ()));
+    c.create(
+        &sender,
+        &recipient,
+        &token,
+        &rate,
+        &START,
+        &(START + 1),
+        &true,
+    );
+
+    assert_eq!(c.try_extend(&(START + 3)), Err(Ok(Error::Overflow)));
+
+    // The failed call changed nothing.
+    let s = c.get();
+    assert_eq!(s.stop, START + 1);
+    assert_eq!(s.deposited, rate);
 }
 
 #[test]

@@ -373,6 +373,71 @@ fn require_auth_one_of_rejects_an_outsider() {
     );
 }
 
+// `require_auth_one_of` has no production caller, so the tests above only call
+// it directly. These drive it through a real contract entry point instead, so
+// the "membership before `require_auth`" rule is checked against the host's
+// actual authorization handling.
+mod one_of_entry_point_tests {
+    use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, Vec};
+
+    use crate::{auth, Error};
+
+    #[contract]
+    struct OneOfEntryPoint;
+
+    #[contractimpl]
+    impl OneOfEntryPoint {
+        pub fn act(_env: Env, caller: Address, allowed: Vec<Address>) -> Result<(), Error> {
+            auth::require_auth_one_of(&caller, &allowed)
+        }
+    }
+
+    #[test]
+    fn an_outsider_is_rejected_before_any_authorization_is_requested() {
+        // No auths are mocked. If `require_auth` ran first it would fail in the
+        // host for the unsigned outsider; instead the membership check returns
+        // `Unauthorized` without ever reaching it.
+        let env = Env::default();
+        let client = OneOfEntryPointClient::new(&env, &env.register(OneOfEntryPoint, ()));
+        let a = Address::generate(&env);
+        let b = Address::generate(&env);
+        let outsider = Address::generate(&env);
+        let allowed = auth::allow_list(&env, &[&a, &b]);
+
+        assert_eq!(
+            client.try_act(&outsider, &allowed),
+            Err(Ok(Error::Unauthorized))
+        );
+    }
+
+    #[test]
+    fn each_allowed_caller_is_accepted_with_its_authorization() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let client = OneOfEntryPointClient::new(&env, &env.register(OneOfEntryPoint, ()));
+        let a = Address::generate(&env);
+        let b = Address::generate(&env);
+        let allowed = auth::allow_list(&env, &[&a, &b]);
+
+        client.act(&a, &allowed);
+        client.act(&b, &allowed);
+    }
+
+    #[test]
+    #[should_panic]
+    fn an_allowed_caller_without_its_authorization_is_rejected_by_the_host() {
+        // Membership passes, so `require_auth` is reached and, with no auth
+        // mocked for `a`, fails in the host.
+        let env = Env::default();
+        let client = OneOfEntryPointClient::new(&env, &env.register(OneOfEntryPoint, ()));
+        let a = Address::generate(&env);
+        let b = Address::generate(&env);
+        let allowed = auth::allow_list(&env, &[&a, &b]);
+
+        client.act(&a, &allowed);
+    }
+}
+
 // ---------------------------------------------------------------- storage
 //
 // `impl_single_position_storage!` is a macro, not a function, so it is
