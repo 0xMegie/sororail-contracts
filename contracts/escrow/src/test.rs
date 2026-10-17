@@ -538,6 +538,22 @@ fn release_rejects_a_closed_escrow() {
     );
 }
 
+/// `release` must reject a disputed escrow with `EscrowNotFunded`: the
+/// arbiter owns the outcome once a dispute is open, so the beneficiary
+/// cannot be paid out from under it. The balance must stay in the contract.
+#[test]
+fn release_rejects_a_disputed_escrow() {
+    let f = Fixture::funded(true);
+    f.client.dispute(&f.depositor);
+    assert_eq!(
+        f.client.try_release(&f.arbiter),
+        Err(Ok(Error::EscrowNotFunded))
+    );
+    assert_eq!(f.client.state(), State::Disputed);
+    assert_eq!(f.escrow_balance(), AMOUNT);
+    assert_eq!(f.token.balance(&f.beneficiary), 0);
+}
+
 // ---------------------------------------------------------------- refund
 
 #[test]

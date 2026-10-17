@@ -16,6 +16,20 @@ withdrawn + refunded + remaining == deposited
 ```
 
 exactly, at every point in the lifecycle, with no rounding leakage.
+
+## Entry points
+
+| Entry point | Caller | Effect |
+|---|---|---|
+| `create` | sender | Records the stream and pulls the full `deposited` amount in. |
+| `withdraw` | recipient | Pays out accrued, unwithdrawn funds (all of them if `amount` is `None`). |
+| `cancel` | sender | Ends a cancellable stream; returns unaccrued funds to the sender. |
+| `top_up` | sender | Adds funds to the deposit. The amount must keep the per-second rate exact. |
+| `extend` | sender | Moves `stop` later and pulls the extra funds the longer span needs. |
+| `balance_of`, `remaining` | anyone | Reads accrued-but-unwithdrawn or unstreamed balances. |
+| `bump`, `get` | anyone | Extends TTL; reads the full stream record. |
+
+See [`Error`] for the typed failures each entry point can return.
 "#]
 
 #[cfg(test)]
