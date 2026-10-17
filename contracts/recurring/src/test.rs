@@ -363,6 +363,26 @@ fn charging_on_schedule_bills_once_per_period() {
     assert_eq!(f.client.get().periods_charged, 6);
 }
 
+/// After a charge, `next_chargeable_at` advances by exactly one period from
+/// the charge instant (`now + period_seconds`), not from the old due date --
+/// the rule documented on `Authorization` (#249).
+#[test]
+fn next_chargeable_at_advances_by_exactly_one_period_after_a_charge() {
+    let f = Fixture::new(None);
+    assert_eq!(f.client.next_chargeable_at(), START + PERIOD);
+
+    // Charge 500s late: the next due date is still one full period from the
+    // charge instant, not one period from the missed boundary.
+    let charged_at = START + PERIOD + 500;
+    f.at(charged_at);
+    f.client.charge();
+    assert_eq!(f.client.next_chargeable_at(), charged_at + PERIOD);
+    assert_eq!(
+        f.client.get().next_chargeable_at,
+        f.client.next_chargeable_at()
+    );
+}
+
 #[test]
 fn charge_stops_at_the_cap() {
     let f = Fixture::new(Some(3));
@@ -580,6 +600,34 @@ fn cancelling_mid_subscription_keeps_what_was_already_charged() {
     assert_eq!(f.token.balance(&f.payee), AMOUNT);
 }
 
+/// Cancellation changes nothing about the period bookkeeping: the count
+/// reported after `cancel` still matches the stored record --
+/// `max_periods - periods_charged` when capped, `None` when uncapped (#251).
+#[test]
+fn remaining_periods_after_cancellation_matches_the_stored_state() {
+    let f = Fixture::new(Some(3));
+    f.at(START + PERIOD);
+    f.client.charge();
+    f.client.cancel(&f.payer);
+
+    let stored = f.client.get();
+    assert_eq!(f.client.remaining_periods(), Some(2));
+    assert_eq!(
+        f.client.remaining_periods(),
+        stored.remaining_periods(),
+        "reported count diverged from the stored authorization"
+    );
+    assert_eq!(
+        f.client.remaining_periods(),
+        Some(stored.max_periods.unwrap() - stored.periods_charged)
+    );
+
+    // An uncapped authorization still reports no count after cancellation.
+    let uncapped = Fixture::new(None);
+    uncapped.client.cancel(&uncapped.payer);
+    assert_eq!(uncapped.client.remaining_periods(), None);
+}
+
 #[test]
 fn is_chargeable_tracks_the_schedule_and_the_cancellation() {
     let f = Fixture::new(None);
@@ -588,4 +636,19 @@ fn is_chargeable_tracks_the_schedule_and_the_cancellation() {
     assert!(f.client.is_chargeable());
     f.client.cancel(&f.payer);
     assert!(!f.client.is_chargeable());
+}
+
+/// The period rule in `types.rs` is `at >= next_chargeable_at`: one second
+/// before the boundary a charge is refused, and it becomes chargeable exactly
+/// on the boundary, not a second later (#250).
+#[test]
+fn is_chargeable_is_true_exactly_at_the_period_boundary() {
+    let f = Fixture::new(None);
+    f.at(START + PERIOD - 1);
+    assert!(!f.client.is_chargeable());
+    f.at(START + PERIOD);
+    assert!(f.client.is_chargeable());
+    // Still chargeable past the boundary until the charge is actually taken.
+    f.at(START + PERIOD + 1);
+    assert!(f.client.is_chargeable());
 }

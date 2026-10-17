@@ -116,3 +116,50 @@ impl Stream {
         self.stop.saturating_sub(self.start)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use soroban_sdk::{testutils::Address as _, Address, Env};
+    use sororail_common::Error;
+
+    use super::Stream;
+
+    /// A bare struct for testing in isolation, with no contract or ledger.
+    fn bare(env: &Env) -> Stream {
+        Stream {
+            sender: Address::generate(env),
+            recipient: Address::generate(env),
+            token: Address::generate(env),
+            rate_per_second: 100,
+            start: 1_000_000,
+            stop: 1_001_000,
+            cancellable: true,
+            deposited: 100 * 1_000,
+            withdrawn: 0,
+            refunded: 0,
+            cancelled_at: None,
+        }
+    }
+
+    /// Documents that `available_at` degrades to `Err(Underflow)` if `withdrawn`
+    /// ever exceeds accrued (e.g. a future code path bug) rather than wrapping
+    /// to a negative `i128`. Today's `withdraw` rejects `requested > available`,
+    /// so this state is unreachable through the contract entry points; the pure
+    /// helper must still error. Mirrors
+    /// `available_at_errors_if_withdrawn_exceeds_accrued` in `test.rs` (#248).
+    #[test]
+    fn available_at_errors_if_withdrawn_exceeds_accrued() {
+        let env = Env::default();
+        let mut s = bare(&env);
+        // Accrued at start+10 is rate_per_second*10; force withdrawn past that.
+        s.withdrawn = s.rate_per_second * 10 + 1;
+        assert_eq!(
+            s.available_at(s.start + 10),
+            Err(Error::Underflow),
+            "available_at must error rather than wrap when withdrawn > accrued"
+        );
+        // Even after full accrual, an over-withdrawn book still errors.
+        s.withdrawn = s.deposited + 1;
+        assert_eq!(s.available_at(s.stop), Err(Error::Underflow));
+    }
+}
