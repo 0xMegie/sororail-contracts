@@ -861,11 +861,43 @@ fn claim_after_the_end_takes_everything() {
     f.assert_conserved();
 }
 
+/// #216 – After the end date the full remaining amount is claimable and
+/// `grant.claimed` reaches `grant.total`.
+#[test]
+fn claim_after_end_date_claimed_field_reaches_total() {
+    let f = Fixture::new(true);
+    f.at(START + DURATION + 1);
+    let claimable = f.client.claimable();
+    assert_eq!(claimable, TOTAL, "full amount must be claimable after end");
+    let returned = f.client.claim();
+    assert_eq!(returned, TOTAL, "claim must return the full total");
+    let grant = f.client.get();
+    assert_eq!(
+        grant.claimed, grant.total,
+        "claimed field must equal total after claiming everything"
+    );
+    f.assert_conserved();
+}
+
 #[test]
 #[should_panic]
 fn claim_requires_the_beneficiarys_authorization() {
     let f = Fixture::new(true);
     f.at(START + 500);
+    f.env.set_auths(&[]);
+    f.client.claim();
+}
+
+/// #218 – A non-beneficiary caller is rejected; only the beneficiary may claim.
+///
+/// Strips all authorisations so no address can satisfy `require_auth`.
+/// Soroban panics on a failed `require_auth`, which `should_panic` catches.
+#[test]
+#[should_panic]
+fn claim_is_callable_only_by_the_beneficiary() {
+    let f = Fixture::new(true);
+    f.at(START + 500);
+    // Remove all auth so neither beneficiary nor anyone else is authorised.
     f.env.set_auths(&[]);
     f.client.claim();
 }
