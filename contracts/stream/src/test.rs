@@ -16,7 +16,7 @@ use sororail_common::{storage::INSTANCE_BUMP, testutils::TestEnv, Error};
 
 use crate::{
     contract::{StreamContract, StreamContractClient},
-    events::{Cancelled, Created, ToppedUp, Withdrawn},
+    events::{Cancelled, Created, Extended, ToppedUp, Withdrawn},
     types::Stream,
 };
 
@@ -134,7 +134,6 @@ fn nothing_accrues_before_start() {
 }
 
 #[test]
- test/issues-296-299-lifecycle-properties
 fn accrual_is_linear_between_start_and_stop() {
     let env = Env::default();
     let s = bare(&env);
@@ -1014,6 +1013,7 @@ fn extend_emits_the_extended_event() {
     let env = &f.env;
     let added: Val = (RATE * 300).into_val(env);
     let deposited: Val = (DEPOSITED + RATE * 300).into_val(env);
+    let old_stop: Val = STOP.into_val(env);
     let new_stop: Val = new_stop_val.into_val(env);
     // Map data: keys are the field names, serialized in sorted order.
     let data: Val = map![
@@ -1021,6 +1021,7 @@ fn extend_emits_the_extended_event() {
         (Symbol::new(env, "added"), added),
         (Symbol::new(env, "deposited"), deposited),
         (Symbol::new(env, "new_stop"), new_stop),
+        (Symbol::new(env, "old_stop"), old_stop),
     ]
     .into_val(env);
     assert_eq!(
@@ -1041,6 +1042,74 @@ fn extend_emits_the_extended_event() {
     );
 }
 
+#[test]
+fn extend_moves_the_stop_later_and_preserves_the_rate_and_conservation() {
+    let f = Fixture::new(true);
+    let before = f.client.get();
+    let new_stop = before.stop + 400;
+    f.client.extend(&new_stop);
+
+    let after = f.client.get();
+    // The stop moved later, by exactly the requested amount.
+    assert_eq!(after.stop, new_stop);
+    assert!(after.stop > before.stop);
+    // The rate is a property of the stream, not the span: it is unchanged, so
+    // `deposited` is recomputable as `rate * (stop - start)`.
+    assert_eq!(after.rate_per_second, before.rate_per_second);
+    assert_eq!(
+        after.deposited,
+        after.rate_per_second * i128::from(after.stop - after.start)
+    );
+    // ...and the conservation invariant still holds after the extension.
+    f.assert_conserved();
+}
+
+#[test]
+fn extend_refuses_to_shorten_the_stream_and_changes_nothing() {
+    let f = Fixture::new(true);
+    f.at(START + 100);
+    let before = f.client.get();
+    let held = f.held();
+    let sender_balance = f.token.balance(&f.sender);
+
+    // Every stop at or before the current one is a shortening (or a no-op),
+    // and `extend` only ever moves the stop later, so all are refused.
+    for bad in [before.stop - 1, before.stop, before.stop - 100] {
+        assert_eq!(
+            f.client.try_extend(&bad),
+            Err(Ok(Error::StreamNotExtendable)),
+            "new_stop {bad} was accepted"
+        );
+    }
+
+    // A refused extension applies nothing: no state change, no tokens pulled.
+    assert_eq!(f.client.get(), before);
+    assert_eq!(f.held(), held);
+    assert_eq!(f.token.balance(&f.sender), sender_balance);
+}
+
+#[test]
+fn extend_event_carries_the_old_and_new_stop_times() {
+    let f = Fixture::new(true);
+    let old_stop = f.client.get().stop;
+    let new_stop = old_stop + 300;
+    f.client.extend(&new_stop);
+
+    // `extend` emits the token's transfer event before its own `Extended`,
+    // so take the last event rather than assuming an index.
+    let all = f.env.events().all();
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
+    let expected = Extended {
+        sender: f.sender.clone(),
+        added: RATE * 300,
+        old_stop,
+        new_stop,
+        deposited: DEPOSITED + RATE * 300,
+    };
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
+}
+
 // -------------------------------------------------------------- balance_of
 
 #[test]
@@ -1059,6 +1128,22 @@ fn balance_of_sender_is_zero_once_cancelled() {
     f.client.cancel();
     assert_eq!(f.client.balance_of(&f.sender), 0);
     assert_eq!(f.client.balance_of(&f.recipient), 0);
+}
+
+#[test]
+fn balance_of_shows_the_recipient_accrued_minus_withdrawn_and_the_sender_the_unstreamed_remainder() {
+    let f = Fixture::new(true);
+    f.at(START + 300);
+    f.client.withdraw(&Some(RATE * 100));
+    f.at(START + 400);
+
+    // Recipient: accrued so far (RATE * 400) minus what was already withdrawn.
+    assert_eq!(f.client.balance_of(&f.recipient), RATE * 400 - RATE * 100);
+    // Sender: the part of the deposit that has not accrued at all yet.
+    assert_eq!(f.client.balance_of(&f.sender), DEPOSITED - RATE * 400);
+    // Anyone else sees nothing.
+    assert_eq!(f.client.balance_of(&f.outsider), 0);
+    f.assert_conserved();
 }
 
 // ---------------------------------------------------- conservation, mixed
@@ -1269,7 +1354,3 @@ mod accrued_at_properties {
         }
     }
 }
-
-fn accrual_is_linear_between_start_and]u髆GР陬澠瓂軄偷叡睍托佌攻衻箿赴佂焉浇撂(€€€€技紒櫧葋a14皝饺佈亯呁攣展バ亼暀ス晲亯鋪选攣呀瓡笣虂憰崶祬碧じ(€€€伭請伾呇晑習蓕蜁嵔箰鑱つ揉�(€€€€技紒1晳潟葋靴禃脱叺纴呅佪ˉ崰亝崓烧叞亯暆ス贪仴竵蜁嵔箲虂庭箥攣选攣U攻�(€€€€技紒暳綅牳(€€€伭請佂褏尚鑱载邪(€€€€技紒1晳潟葋靴禃脱叺纴呅佪ˉ崰亝崓烧叞仌箲贪仴竵蜁嵔箲虂庭箥攣选攣U攻�(€€€€技紒暳綅牳(€€€伭請佂呀黎佋匦�(€€€€技紒]选暼佈佂暪憰葋祬鋪崊箥暟亯暀缴攣佂呀羳�(€€€伭請亶吂崟北厜睌鑱壗桨�(€€€€技紒Q窖叞仌贂葋琳北晲仚山磥选攣蜁箲暼皝ジ佈佈江暩澨佂祬北曂衼展バ竵陛呭�(€€€€技紒伾呇晑習蓕蜁嵔箰€█⊥呀纮磥脱吷啸€�(€€€伭請亼暳酵パ晲鑱つ揉�(€€€€技紒Q窖叞仌贂葋羺伣招佈紒选攣蓵崶隶暪邪仴竵选攣呀瓡笣虂偷叡睍托佌攻懈(€€€伭請佪パ蓞莞鑱つ揉�(€€€€技紒Q窖叞仌贂葋蓵颜晒晲佈紒选攣蜁箲暼伣竵崊箥暠眳靴礁皝ジ佈佈江暩澨(€€€€技紒偷叡睍托佌攻懈(€€€伭請伾暀展憰愯仱娜喟(€€€€技紒]竵选攣脱蓵叴佪吿亶吂崟北晲皝仴衼輩贪仴竵蜁嵔箲虂庭箥攣选攣U攻�(€€€€技紒暳綅牳�崓烧叞佂呀撂仭暽敻(€€€伭請亶吂崟北晳}呅鑱=裂ソ格载续�)�()サ涟丮焉晠磥�(€€€€技紒Q窖叞亝崓烧晲佈紒选攣蓵崶隶暪衼吿伣榿亝褉皝荨曆葋荪选懮呡竵饺伖叫�(€€€€技�(€€€€技紒A丈旇伖紒脱缴厺敯伖紒暪佶山沟暪懈�
-眳盗晲亝衼壗褷仌箲虁创伖窖ˉ箿(€€€€技紒厤嵣諘虂墪櫧蓴亖脱吷褉皝吂悂厤嵣諈皝毖虂呅亖脱搅€伣葋呅佈(€€€€技紒崊箥暠眳靴礁佈サ曂褏道皝荨贂葋嵔禃虂櫏赏懈丵伾曂毡衼崊竵箷贂�(€€€€技紒曖崟晲亖憰两庭褧憖�(€€€伭請仚竵厤嵣諘憓呅牂蜁睒皝呅鑱载肖€带両曂毡旭つ揉皝缮饺鴣�(€€€€€€€伇曅伒招仌櫃晬靴贁€魜呅�(€€€€€€€仴榿睍衼M降敗崊箥暠睍悿€魜蜁睒箥吂崟北晳}呅侅(€€€€€€€€€€€仌櫃晬靴贁€魜暀檿嵮ベ敼单浮崊箥暠睍悿�(€€€€€€€侓(€€€€€€€仌櫃晬靴贁€魜暀檿嵮ベ敼单浮蜁睒雇呀坤�((€€€€€€€仴榿暀檿嵮ベ攢痿佂暠樄脱吷衼�(€€€€€€€€€€€伾曆丈竵=瑺坤�(€€€€€€€侓(€€€€€€€伇曅仌眳镣晲€魜祬褷栝驼垺つ揉栝櫳酱櫃晬靴贁ぐ仱娜噼闄山础蜁睒雇褏尚い(€€€€€€€伇曅亝崓烧晲€魜祬褷栝嫡啊蜁睒股呇晑習蓕蜁嵔箰皝暠吜蜁悿(€€€€€€€�=祬褷栝单浮厤嵣諘惏佂暠樄憰两庭褧悿�(€€€侓((€€€€技紒崓烧晲亯招伖叫佸曅佪パ蓞莞皝吿伣榿亝褉竵]衼选攣蓵崶隶暪衼崊竵褏瓟�(€€€伭請仚竵呝叆眳壉晑呅牂蜁睒皝呅鑱载肖€带両曂毡旭つ揉皝缮饺鴣�(€€€€€€€伇曅亝崓烧晲€魜蜁睒箙崓烧晳}呅肖(€€€€€€€仴榿蜁睒馆パ蓞莞€鴣厤嵣諘悂�(€€€€€€€€€€€伾曆丈竵扇�缮饺栝U箲暽櫛杰れ(€€€€€€€侓(€€€€€€€伒呇犺橥請崓烧晲皝蜁睒馆パ蓞莞�(€€€侓((€€€€技紒]衼选攣嵔寡蓞嵭佂靴卑仭奖懱仚饺佈ˉ虂脱蓵叴�(€€€伭請仚竵蓵祬スス湢櫷暠槫€带両曂毡旭つ揉皝缮饺鴣�(€€€€€€€伒呇犺橥請〉呇犺橥請⊥暠樄憰两庭褧惏佂暠樄荪选懮呡袱佂暠樄蓵櫿箲晲�(€€€侓((€€€€技紒]选暼佈佂焉晠磥虂墪暩亶吂崟北晲�(€€€€技�(€€€€技紒Q伇晬鍗睌仴虂墺箙射亝箰伣箶递呬皝图仴衼ヌ伒綉暠睍悂変佈(€€€€技紒亶吂崟北晳}呇€佈サ曂褏道€≥ˉ崰亝崓烧叞伖晻懱亝瑰輩浃伾呇葋选吀亜(€€€€技紒丮褏褧€仌拐磥饱瓟仌蛵山軡谈丮晹€�1晬鍗睌伒綉暠ス湀仴竵MA沟惛(€€€伭請仚竵ネ}崊箥暠睍悹櫷暠槫€带亯浇皝�(€€€€€€€佂暠樄崊箥暠睍憓呅攻蛚徒禂牑(€€€侓((€€€€技紒Q亼晬眳蓵悂土吀仴竵蜁嵔箲谈(€€€伭請仚竵懻蓞靴礁牂蜁睒带佋匦侅(€€€€€€€佂暠樄脱嚼雇呇丈呇ス潁驼垺蜁睒雇褏尚�(€€€侓)�(
- main
