@@ -31,6 +31,18 @@ fn bump_restores_the_instance_ttl_after_ledger_advance() {
     });
 }
 
+#[test]
+fn bump_extends_the_instance_ttl() {
+    let f = Fixture::new(true);
+    f.env.as_contract(&f.client.address, || {
+        assert!(f.env.storage().instance().get_ttl() <= INSTANCE_BUMP);
+    });
+    f.client.bump();
+    f.env.as_contract(&f.client.address, || {
+        assert_eq!(f.env.storage().instance().get_ttl(), INSTANCE_BUMP);
+    });
+}
+
 const TOTAL: i128 = 1_000_000;
 const START: u64 = 1_000_000;
 const CLIFF: u64 = 100;
