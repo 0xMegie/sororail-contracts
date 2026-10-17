@@ -1107,6 +1107,39 @@ fn vesting_with_long_duration_and_large_total_probes_overflow_boundary() {
     );
 }
 
+// ------------------------------------------------------- issue #223: vested_amount before start
+
+#[test]
+fn vested_amount_is_zero_before_the_start() {
+    let env = Env::default();
+    let g = bare(&env, CLIFF, DURATION);
+    // Any timestamp strictly before `start` must return exactly 0 — never negative.
+    assert_eq!(g.vested_amount(0), Ok(0));
+    assert_eq!(g.vested_amount(START - 1), Ok(0));
+    // Sanity: the boundary itself also returns 0 (nothing vested at t=start).
+    assert_eq!(g.vested_amount(START), Ok(0));
+}
+
+// ------------------------------------------------------- issue #224: claimable after partial claim
+
+#[test]
+fn claimable_equals_vested_minus_claimed_after_partial_claim() {
+    let f = Fixture::new(true);
+    // Advance to halfway through the schedule and make a first claim.
+    f.at(START + 500);
+    let first_claim = f.client.claim();
+    assert_eq!(first_claim, TOTAL / 2);
+
+    // Advance further; more has vested.
+    f.at(START + 750);
+    let claimable = f.client.claimable();
+    let grant = f.client.get();
+    // claimable must equal vested_at_now minus already_claimed.
+    let vested_now = f.client.vested_amount(&(START + 750));
+    assert_eq!(claimable, vested_now - grant.claimed);
+    f.assert_conserved();
+}
+
 // ---------------------------------------------------------------- property
 
 mod vested_amount_properties {
