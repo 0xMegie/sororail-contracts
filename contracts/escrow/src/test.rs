@@ -810,6 +810,45 @@ fn resolve_rejects_basis_points_above_the_maximum() {
 }
 
 #[test]
+fn resolve_rejects_a_split_whose_product_overflows_at_the_max_amount() {
+    // `split_bps` multiplies `amount * bps` in i128 before dividing, so an
+    // escrow holding exactly i128::MAX can only be resolved at 0 or 1 bps;
+    // 2 bps is the first split whose intermediate product overflows. (The
+    // shared `Fixture` mints `amount * 10`, which cannot be built at MAX.)
+    let te = TestEnv::at(START_TS);
+    let (token, depositor) = te.make_token(i128::MAX);
+    let token_address = token.address.clone();
+    let beneficiary = te.make_address();
+    let arbiter = te.make_address();
+    let env = te.env().clone();
+    let client = EscrowContractClient::new(&env, &env.register(EscrowContract, ()));
+    client.init(
+        &depositor,
+        &beneficiary,
+        &Some(arbiter),
+        &token_address,
+        &i128::MAX,
+        &DEADLINE,
+    );
+    client.fund();
+    client.dispute(&depositor);
+
+    assert_eq!(client.try_resolve(&2), Err(Ok(Error::Overflow)));
+    // The failed call changed nothing.
+    assert_eq!(client.state(), State::Disputed);
+    assert_eq!(token.balance(&client.address), i128::MAX);
+
+    // 1 bps is the largest split that still resolves, and it conserves the
+    // full amount exactly.
+    client.resolve(&1);
+    let to_beneficiary = i128::MAX / 10_000;
+    assert_eq!(token.balance(&beneficiary), to_beneficiary);
+    assert_eq!(token.balance(&depositor), i128::MAX - to_beneficiary);
+    assert_eq!(token.balance(&client.address), 0);
+    assert_eq!(client.state(), State::Resolved);
+}
+
+#[test]
 fn resolve_endpoints_pay_one_side_in_full() {
     let f = Fixture::funded(true);
     f.client.dispute(&f.depositor);

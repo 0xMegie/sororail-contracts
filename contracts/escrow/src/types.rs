@@ -63,6 +63,21 @@ impl State {
 }
 
 /// The full escrow agreement. One per deployed contract instance.
+///
+/// # The conservation invariant
+///
+/// The contract holds `amount` only while `state` is `Funded` or `Disputed`,
+/// and pays exactly that amount out exactly once, to {beneficiary, depositor}:
+///
+/// ```text
+/// paid_to_beneficiary + paid_to_depositor == amount
+/// ```
+///
+/// `release` pays all of it to the beneficiary, `refund` pays all of it to the
+/// depositor, and `resolve` splits it between the two, deriving the depositor's
+/// share by subtraction so the parts always sum to `amount` with no rounding
+/// leakage. `cancel` only applies in `Created`, before anything is held. After
+/// a terminal state the contract holds nothing for this escrow.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Escrow {

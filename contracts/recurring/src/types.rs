@@ -21,6 +21,21 @@ use sororail_common::math;
 /// This is a deliberate consumer-protection choice, not an oversight. It costs
 /// the payee the revenue of periods they did not collect, and it guarantees
 /// the payer can never be surprised by a bundled back-charge.
+///
+/// # The pull invariant
+///
+/// Because this contract holds no funds, there is nothing for it to conserve
+/// internally; the invariant is on what it can move. Every successful `charge`
+/// transfers exactly `amount_per_period` from the payer to the payee and
+/// increments `periods_charged` by one, and a failed transfer reverts the
+/// increment with it. So the total ever pulled is always exactly:
+///
+/// ```text
+/// periods_charged * amount_per_period
+/// ```
+///
+/// and, when `max_periods` is set, never more than `max_periods *
+/// amount_per_period`.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Authorization {
