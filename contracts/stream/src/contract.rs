@@ -200,9 +200,10 @@ impl StreamContract {
             return Err(Error::StreamNotExtendable);
         }
 
+        let old_stop = stream.stop;
         let added = math::mul(
             stream.rate_per_second,
-            math::sub(i128::from(new_stop), i128::from(stream.stop))?,
+            math::sub(i128::from(new_stop), i128::from(old_stop))?,
         )?;
         stream.stop = new_stop;
         stream.deposited = math::add(stream.deposited, added)?;
@@ -212,6 +213,7 @@ impl StreamContract {
         events::Extended {
             sender: stream.sender.clone(),
             added,
+            old_stop,
             new_stop,
             deposited: stream.deposited,
         }

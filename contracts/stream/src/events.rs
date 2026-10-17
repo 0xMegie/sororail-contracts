@@ -62,6 +62,8 @@ pub struct Extended {
     #[topic]
     pub sender: Address,
     pub added: i128,
+    /// The `stop` the stream had before this call.
+    pub old_stop: u64,
     pub new_stop: u64,
     pub deposited: i128,
 }

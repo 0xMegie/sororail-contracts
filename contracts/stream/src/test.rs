@@ -16,7 +16,7 @@ use sororail_common::{storage::INSTANCE_BUMP, testutils::TestEnv, Error};
 
 use crate::{
     contract::{StreamContract, StreamContractClient},
-    events::{Cancelled, Created, ToppedUp, Withdrawn},
+    events::{Cancelled, Created, Extended, ToppedUp, Withdrawn},
     types::Stream,
 };
 
@@ -1074,6 +1074,7 @@ fn extend_emits_the_extended_event() {
     let env = &f.env;
     let added: Val = (RATE * 300).into_val(env);
     let deposited: Val = (DEPOSITED + RATE * 300).into_val(env);
+    let old_stop: Val = STOP.into_val(env);
     let new_stop: Val = new_stop_val.into_val(env);
     // Map data: keys are the field names, serialized in sorted order.
     let data: Val = map![
@@ -1081,6 +1082,7 @@ fn extend_emits_the_extended_event() {
         (Symbol::new(env, "added"), added),
         (Symbol::new(env, "deposited"), deposited),
         (Symbol::new(env, "new_stop"), new_stop),
+        (Symbol::new(env, "old_stop"), old_stop),
     ]
     .into_val(env);
     assert_eq!(
@@ -1101,6 +1103,74 @@ fn extend_emits_the_extended_event() {
     );
 }
 
+#[test]
+fn extend_moves_the_stop_later_and_preserves_the_rate_and_conservation() {
+    let f = Fixture::new(true);
+    let before = f.client.get();
+    let new_stop = before.stop + 400;
+    f.client.extend(&new_stop);
+
+    let after = f.client.get();
+    // The stop moved later, by exactly the requested amount.
+    assert_eq!(after.stop, new_stop);
+    assert!(after.stop > before.stop);
+    // The rate is a property of the stream, not the span: it is unchanged, so
+    // `deposited` is recomputable as `rate * (stop - start)`.
+    assert_eq!(after.rate_per_second, before.rate_per_second);
+    assert_eq!(
+        after.deposited,
+        after.rate_per_second * i128::from(after.stop - after.start)
+    );
+    // ...and the conservation invariant still holds after the extension.
+    f.assert_conserved();
+}
+
+#[test]
+fn extend_refuses_to_shorten_the_stream_and_changes_nothing() {
+    let f = Fixture::new(true);
+    f.at(START + 100);
+    let before = f.client.get();
+    let held = f.held();
+    let sender_balance = f.token.balance(&f.sender);
+
+    // Every stop at or before the current one is a shortening (or a no-op),
+    // and `extend` only ever moves the stop later, so all are refused.
+    for bad in [before.stop - 1, before.stop, before.stop - 100] {
+        assert_eq!(
+            f.client.try_extend(&bad),
+            Err(Ok(Error::StreamNotExtendable)),
+            "new_stop {bad} was accepted"
+        );
+    }
+
+    // A refused extension applies nothing: no state change, no tokens pulled.
+    assert_eq!(f.client.get(), before);
+    assert_eq!(f.held(), held);
+    assert_eq!(f.token.balance(&f.sender), sender_balance);
+}
+
+#[test]
+fn extend_event_carries_the_old_and_new_stop_times() {
+    let f = Fixture::new(true);
+    let old_stop = f.client.get().stop;
+    let new_stop = old_stop + 300;
+    f.client.extend(&new_stop);
+
+    // `extend` emits the token's transfer event before its own `Extended`,
+    // so take the last event rather than assuming an index.
+    let all = f.env.events().all();
+    let events = all.events();
+    let last = events.last().expect("no events emitted");
+    let expected = Extended {
+        sender: f.sender.clone(),
+        added: RATE * 300,
+        old_stop,
+        new_stop,
+        deposited: DEPOSITED + RATE * 300,
+    };
+    assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
+}
+
 // -------------------------------------------------------------- balance_of
 
 #[test]
@@ -1119,6 +1189,22 @@ fn balance_of_sender_is_zero_once_cancelled() {
     f.client.cancel();
     assert_eq!(f.client.balance_of(&f.sender), 0);
     assert_eq!(f.client.balance_of(&f.recipient), 0);
+}
+
+#[test]
+fn balance_of_shows_the_recipient_accrued_minus_withdrawn_and_the_sender_the_unstreamed_remainder() {
+    let f = Fixture::new(true);
+    f.at(START + 300);
+    f.client.withdraw(&Some(RATE * 100));
+    f.at(START + 400);
+
+    // Recipient: accrued so far (RATE * 400) minus what was already withdrawn.
+    assert_eq!(f.client.balance_of(&f.recipient), RATE * 400 - RATE * 100);
+    // Sender: the part of the deposit that has not accrued at all yet.
+    assert_eq!(f.client.balance_of(&f.sender), DEPOSITED - RATE * 400);
+    // Anyone else sees nothing.
+    assert_eq!(f.client.balance_of(&f.outsider), 0);
+    f.assert_conserved();
 }
 
 // ---------------------------------------------------- conservation, mixed
