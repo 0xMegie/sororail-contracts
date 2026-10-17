@@ -300,9 +300,8 @@ fn error_discriminants_are_unique() {
 
 // ---------------------------------------------------------------- auth
 //
-// Only the rejection paths are unit-tested here. The accept path calls
-// `require_auth`, which needs a real contract invocation context, so it is
-// covered in each contract's own tests.
+// Direct calls cover rejection before authentication. The entry-point tests
+// below provide the contract context needed to exercise `require_auth`.
 
 #[test]
 fn require_reports_the_given_error() {
@@ -360,35 +359,29 @@ fn require_auth_either_opt_rejects_when_optional_party_absent() {
     );
 }
 
-#[test]
-fn require_auth_one_of_rejects_an_outsider() {
-    let env = Env::default();
-    let a = Address::generate(&env);
-    let b = Address::generate(&env);
-    let outsider = Address::generate(&env);
-    let allowed = auth::allow_list(&env, &[&a, &b]);
-    assert_eq!(
-        auth::require_auth_one_of(&outsider, &allowed),
-        Err(Error::Unauthorized)
-    );
-}
-
-// `require_auth_one_of` has no production caller, so the tests above only call
-// it directly. These drive it through a real contract entry point instead, so
-// the "membership before `require_auth`" rule is checked against the host's
-// actual authorization handling.
-mod one_of_entry_point_tests {
-    use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, Vec};
+// Drive the production two-party guards through real contract entry points so
+// membership and signature requirements are checked against the host.
+mod auth_entry_point_tests {
+    use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env};
 
     use crate::{auth, Error};
 
     #[contract]
-    struct OneOfEntryPoint;
+    struct AuthEntryPoint;
 
     #[contractimpl]
-    impl OneOfEntryPoint {
-        pub fn act(_env: Env, caller: Address, allowed: Vec<Address>) -> Result<(), Error> {
-            auth::require_auth_one_of(&caller, &allowed)
+    impl AuthEntryPoint {
+        pub fn act(_env: Env, caller: Address, a: Address, b: Address) -> Result<(), Error> {
+            auth::require_auth_either(&caller, &a, &b)
+        }
+
+        pub fn act_optional(
+            _env: Env,
+            caller: Address,
+            a: Address,
+            b: Option<Address>,
+        ) -> Result<(), Error> {
+            auth::require_auth_either_opt(&caller, &a, &b)
         }
     }
 
@@ -398,14 +391,21 @@ mod one_of_entry_point_tests {
         // host for the unsigned outsider; instead the membership check returns
         // `Unauthorized` without ever reaching it.
         let env = Env::default();
-        let client = OneOfEntryPointClient::new(&env, &env.register(OneOfEntryPoint, ()));
+        let client = AuthEntryPointClient::new(&env, &env.register(AuthEntryPoint, ()));
         let a = Address::generate(&env);
         let b = Address::generate(&env);
         let outsider = Address::generate(&env);
-        let allowed = auth::allow_list(&env, &[&a, &b]);
 
         assert_eq!(
-            client.try_act(&outsider, &allowed),
+            client.try_act(&outsider, &a, &b),
+            Err(Ok(Error::Unauthorized))
+        );
+        assert_eq!(
+            client.try_act_optional(&outsider, &a, &Some(b.clone())),
+            Err(Ok(Error::Unauthorized))
+        );
+        assert_eq!(
+            client.try_act_optional(&b, &a, &None),
             Err(Ok(Error::Unauthorized))
         );
     }
@@ -414,27 +414,37 @@ mod one_of_entry_point_tests {
     fn each_allowed_caller_is_accepted_with_its_authorization() {
         let env = Env::default();
         env.mock_all_auths();
-        let client = OneOfEntryPointClient::new(&env, &env.register(OneOfEntryPoint, ()));
+        let client = AuthEntryPointClient::new(&env, &env.register(AuthEntryPoint, ()));
         let a = Address::generate(&env);
         let b = Address::generate(&env);
-        let allowed = auth::allow_list(&env, &[&a, &b]);
 
-        client.act(&a, &allowed);
-        client.act(&b, &allowed);
+        client.act(&a, &a, &b);
+        client.act(&b, &a, &b);
+        client.act_optional(&a, &a, &Some(b.clone()));
+        client.act_optional(&b, &a, &Some(b.clone()));
+        client.act_optional(&a, &a, &None);
     }
 
     #[test]
-    #[should_panic]
     fn an_allowed_caller_without_its_authorization_is_rejected_by_the_host() {
         // Membership passes, so `require_auth` is reached and, with no auth
         // mocked for `a`, fails in the host.
         let env = Env::default();
-        let client = OneOfEntryPointClient::new(&env, &env.register(OneOfEntryPoint, ()));
+        let client = AuthEntryPointClient::new(&env, &env.register(AuthEntryPoint, ()));
         let a = Address::generate(&env);
         let b = Address::generate(&env);
-        let allowed = auth::allow_list(&env, &[&a, &b]);
 
-        client.act(&a, &allowed);
+        for caller in [&a, &b] {
+            assert!(matches!(client.try_act(caller, &a, &b), Err(Err(_))));
+            assert!(matches!(
+                client.try_act_optional(caller, &a, &Some(b.clone())),
+                Err(Err(_))
+            ));
+        }
+        assert!(matches!(
+            client.try_act_optional(&a, &a, &None),
+            Err(Err(_))
+        ));
     }
 }
 

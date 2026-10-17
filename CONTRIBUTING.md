@@ -115,6 +115,11 @@ membership-before-auth rule above.
 
 Used by `escrow` (`release`, `refund`, `dispute`) and `recurring::cancel`.
 
+Use `require_auth_either` for two fixed parties, or `require_auth_either_opt`
+for a fixed party and an optional second party. Production code standardizes
+on these guards; the unused `allow_list` and `require_auth_one_of` helpers
+have been removed (#28).
+
 Rules of thumb:
 
 - Do not add a `caller` argument to a single-party entry point "for

@@ -1125,7 +1125,10 @@ fn revoke_succeeds_immediately_after_claiming_all_vested_tokens() {
 
     let claimed = f.client.claim();
     let vested_now = f.client.vested_amount(&(START + 300));
-    assert_eq!(claimed, vested_now, "claim must take the full vested amount");
+    assert_eq!(
+        claimed, vested_now,
+        "claim must take the full vested amount"
+    );
     assert_eq!(f.client.get().claimed, vested_now);
 
     // Revoke at the very same timestamp: claimed == vested, so the event's
@@ -1137,11 +1140,7 @@ fn revoke_succeeds_immediately_after_claiming_all_vested_tokens() {
         "only the unvested remainder is returned"
     );
 
-    let events = f
-        .env
-        .events()
-        .all()
-        .filter_by_contract(&f.client.address);
+    let events = f.env.events().all().filter_by_contract(&f.client.address);
     let last = events.events().last().expect("no events emitted");
     let expected = Revoked {
         grantor: f.grantor.clone(),
@@ -1152,10 +1151,7 @@ fn revoke_succeeds_immediately_after_claiming_all_vested_tokens() {
     assert_eq!(last, &expected.to_xdr(&f.env, &f.client.address));
 
     // Nothing is left to claim, and conservation still holds.
-    assert_eq!(
-        f.client.try_claim(),
-        Err(Ok(Error::VestingNothingToClaim))
-    );
+    assert_eq!(f.client.try_claim(), Err(Ok(Error::VestingNothingToClaim)));
     f.assert_conserved();
 }
 

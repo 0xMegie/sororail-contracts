@@ -7,8 +7,12 @@
 //! Note the ordering rule these helpers enforce: **membership is checked
 //! before `require_auth`**. Checking auth first would let an unrelated address
 //! that happens to hold a valid signature reach the authorization prompt.
+//!
+//! Use [`require_auth_either`] for two fixed parties and
+//! [`require_auth_either_opt`] when the second party is optional. These guards
+//! compare stored addresses directly, without allocating an allow-list.
 
-use soroban_sdk::{Address, Env, Vec};
+use soroban_sdk::Address;
 
 use crate::Error;
 
@@ -25,16 +29,6 @@ pub fn require(cond: bool, err: Error) -> Result<(), Error> {
 /// Requires that `caller` is `expected`, then requires its authorization.
 pub fn require_auth_as(caller: &Address, expected: &Address) -> Result<(), Error> {
     require(caller == expected, Error::Unauthorized)?;
-    caller.require_auth();
-    Ok(())
-}
-
-/// Requires that `caller` is one of `allowed`, then requires its authorization.
-///
-/// `allowed` is expected to be short -- two or three addresses -- so the linear
-/// scan is deliberate.
-pub fn require_auth_one_of(caller: &Address, allowed: &Vec<Address>) -> Result<(), Error> {
-    require(allowed.contains(caller), Error::Unauthorized)?;
     caller.require_auth();
     Ok(())
 }
@@ -60,19 +54,10 @@ pub fn require_auth_either_opt(
     Ok(())
 }
 
-/// Convenience for building a short allow-list.
-pub fn allow_list(env: &Env, addrs: &[&Address]) -> Vec<Address> {
-    let mut v = Vec::new(env);
-    for a in addrs {
-        v.push_back((*a).clone());
-    }
-    v
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::{contract, testutils::Address as _};
+    use soroban_sdk::{contract, testutils::Address as _, Env};
 
     #[contract]
     struct AuthTestHost;
@@ -166,36 +151,5 @@ mod tests {
             assert!(require_auth_either(&addr_b, &addr_a, &addr_b).is_ok());
             assert!(require_auth_either(&other, &addr_a, &addr_b).is_err());
         });
-    }
-
-    #[test]
-    fn test_require_auth_one_of() {
-        let (env, id) = auth_env();
-
-        let addr_a = Address::generate(&env);
-        let addr_b = Address::generate(&env);
-        let other = Address::generate(&env);
-
-        let allowed = allow_list(&env, &[&addr_a, &addr_b]);
-
-        env.as_contract(&id, || {
-            assert!(require_auth_one_of(&addr_a, &allowed).is_ok());
-            assert!(require_auth_one_of(&addr_b, &allowed).is_ok());
-            assert!(require_auth_one_of(&other, &allowed).is_err());
-        });
-    }
-
-    #[test]
-    fn test_allow_list() {
-        let env = Env::default();
-
-        let addr_a = Address::generate(&env);
-        let addr_b = Address::generate(&env);
-
-        let list = allow_list(&env, &[&addr_a, &addr_b]);
-
-        assert_eq!(list.len(), 2);
-        assert!(list.contains(&addr_a));
-        assert!(list.contains(&addr_b));
     }
 }

@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking (Rust API):** removed the unused `sororail_common::auth::allow_list`
+  and `require_auth_one_of` helpers (#28). Use `require_auth_either` or
+  `require_auth_either_opt` for the supported two-party authorization patterns.
+  Contract entry points, authorization behavior and error codes are unchanged.
 - `recurring::authorize` rejects `payer == payee` with `IdenticalParties` (#314). Previously a self-subscription was accepted; it moved no value but is now refused up front.
 - Regression tests confirm `vesting::create` and `stream::create` refuse identical parties before any funds move and leave no record behind (#312, #313). The checks themselves predate this change.
 
