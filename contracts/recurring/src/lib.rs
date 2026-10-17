@@ -14,6 +14,18 @@ without cancelling here.
 `now + period_seconds` each time, so a payee who forgets to charge for three
 months cannot then take three payments at once. That is a deliberate
 consumer-protection choice.
+
+## Entry points
+
+| Entry point | Caller | Effect |
+|---|---|---|
+| `authorize` | payer | Records the cap and cadence. Requires payer auth. |
+| `charge` | payee | Pulls one period's amount from payer to payee via `transfer_from`. |
+| `cancel` | payer or payee | Stops future charges. Revoking the token allowance also stops them. |
+| `next_chargeable_at`, `is_chargeable`, `remaining_periods` | anyone | Reads the schedule and what is still allowed. |
+| `bump`, `get` | anyone | Extends TTL; reads the full authorization record. |
+
+See [`Error`] for the typed failures each entry point can return.
 "#]
 
 #[cfg(test)]
