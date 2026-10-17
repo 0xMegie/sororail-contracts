@@ -153,6 +153,39 @@ fn the_cliff_vests_the_elapsed_proportion_in_one_step() {
     assert_eq!(g.vested_amount(START + CLIFF), Ok(TOTAL / 10));
 }
 
+/// Issue #222: the cliff timestamp is **inclusive** — `vested_amount` at
+/// exactly `start + cliff` must return a non-zero amount equal to the
+/// elapsed proportion, and the second immediately before must return zero.
+/// This pins the boundary documented in `docs/vesting-safe-range.md` and
+/// in `Grant::vested_amount`: "Nothing vests before `start + cliff`; at
+/// that moment the elapsed proportion vests in one step."
+#[test]
+fn vested_amount_at_exact_cliff_is_inclusive_and_nonzero() {
+    let env = Env::default();
+    let g = bare(&env, CLIFF, DURATION);
+    let cliff_at = g.cliff_at(); // == START + CLIFF
+
+    // One second before the cliff: nothing vested.
+    assert_eq!(
+        g.vested_amount(cliff_at - 1),
+        Ok(0),
+        "one second before cliff must vest nothing"
+    );
+    // Exactly at the cliff: the elapsed proportion vests (cliff is inclusive).
+    // elapsed = CLIFF (100), duration = DURATION (1000) → 100/1000 of TOTAL.
+    let expected = TOTAL * i128::from(CLIFF) / i128::from(DURATION);
+    assert_eq!(
+        g.vested_amount(cliff_at),
+        Ok(expected),
+        "exact cliff timestamp must be inclusive and vest the elapsed proportion"
+    );
+    // One second after the cliff: slightly more has vested (linear increase).
+    assert!(
+        g.vested_amount(cliff_at + 1).unwrap() > expected,
+        "one second after cliff must vest more than at the cliff"
+    );
+}
+
 #[test]
 fn vesting_is_linear_after_the_cliff() {
     let env = Env::default();
@@ -963,6 +996,55 @@ fn revoke_rejects_a_second_call() {
     f.at(START + 300);
     f.client.revoke();
     assert_eq!(f.client.try_revoke(), Err(Ok(Error::VestingRevoked)));
+}
+
+/// Issue #221: a second revoke must return `VestingRevoked` regardless of
+/// how much time passes between the two calls.
+#[test]
+fn revoke_twice_is_rejected_with_already_revoked_error() {
+    let f = Fixture::new(true);
+    f.at(START + 300);
+    f.client.revoke();
+    // Advance time past the end of the schedule and try again.
+    f.at(START + DURATION + 1_000);
+    assert_eq!(
+        f.client.try_revoke(),
+        Err(Ok(Error::VestingRevoked)),
+        "second revoke must return VestingRevoked"
+    );
+}
+
+/// Issue #220: after a revoke the beneficiary can only claim the vested
+/// portion; a claim that would exceed the vested amount errors and no
+/// tokens are transferred.
+#[test]
+fn claim_after_revoke_only_pays_the_vested_portion_and_no_more() {
+    let f = Fixture::new(true);
+    // Revoke at 30 % through the schedule — 300 000 tokens are vested,
+    // 700 000 are returned to the grantor.
+    f.at(START + 300);
+    let grantor_before = f.token.balance(&f.grantor);
+    f.client.revoke();
+    assert_eq!(f.token.balance(&f.grantor), grantor_before + TOTAL * 7 / 10);
+
+    // Advance time well past the end — the frozen vested amount is still
+    // 300 000; no additional tokens are accrued after revocation.
+    f.at(START + DURATION + 10_000);
+
+    // Claim the vested portion — this must succeed.
+    assert_eq!(f.client.claim(), TOTAL * 3 / 10);
+    assert_eq!(f.token.balance(&f.beneficiary), TOTAL * 3 / 10);
+    f.assert_conserved();
+
+    // A second claim must fail because nothing is left to claim.
+    assert_eq!(
+        f.client.try_claim(),
+        Err(Ok(Error::VestingNothingToClaim)),
+        "claim after revoke exhausted must error"
+    );
+    // Beneficiary balance is unchanged.
+    assert_eq!(f.token.balance(&f.beneficiary), TOTAL * 3 / 10);
+    f.assert_conserved();
 }
 
 #[test]
